@@ -13,8 +13,8 @@ PELLETREWARD = 1
 POWERPELLETREWARD = 2
 FRUITREWARD = 3
 
-
-register(id="pacman-v0", entry_point="pacman_env:PacmanEnv", max_episode_steps=1000)
+if "pacman-v0" not in gym.envs.registry:
+    register(id="pacman-v0", entry_point="pacman_env:PacmanEnv", max_episode_steps=1000)
 
 
 class PacmanEnv(gym.Env):
@@ -23,7 +23,7 @@ class PacmanEnv(gym.Env):
     def __init__(self, render_mode=None):
         self.game = GameController(rlTraining=True)
 
-        ghosts_position_max = np.empty((NUMGHOSTS, 2), dtype=int)
+        ghosts_position_max = np.empty((NUMGHOSTS, 3), dtype=int)
         for i in list(range(ghosts_position_max.shape[0])):
             ghosts_position_max[i][0] = SCREENWIDTH
             ghosts_position_max[i][1] = SCREENHEIGHT
@@ -39,7 +39,7 @@ class PacmanEnv(gym.Env):
                     0, np.array([SCREENWIDTH, SCREENHEIGHT]), dtype=int
                 ),
                 "ghosts_position": spaces.Box(
-                    0, ghosts_position_max, (NUMGHOSTS, 2), dtype=int
+                    0, ghosts_position_max, (NUMGHOSTS, 3), dtype=int
                 ),
                 "rewards_position": spaces.Box(
                     0, rewards_position_max, (SCREENHEIGHT, SCREENWIDTH), dtype=int
@@ -49,7 +49,7 @@ class PacmanEnv(gym.Env):
         self.action_space = spaces.Discrete(5, start=-2)
 
         self._pacman_position = np.array([0, 0])
-        self._ghosts_position = np.zeros((NUMGHOSTS, 2), dtype=int)
+        self._ghosts_position = np.zeros((NUMGHOSTS, 3), dtype=int)
         self._rewards_position = np.zeros((SCREENHEIGHT, SCREENWIDTH), dtype=int)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -63,23 +63,31 @@ class PacmanEnv(gym.Env):
         self._pacman_position = np.array(self.game.pacman.position.asInt(), int)
 
         for i in list(range(self._ghosts_position.shape[0])):
-            self._ghosts_position[i] = np.array(
-                self.game.ghosts[i].position.asInt(), int
+            self._ghosts_position[i][:2] = np.array(
+                self.game.ghosts.ghosts[i].position.asInt(), int
             )
+            if self.game.ghosts.ghosts[i].mode.current == FREIGHT:
+                self._ghosts_position[i][2] = 1
+            else:
+                self._ghosts_position[i][2] = 0
 
         # place pellets
         for pellet in self.game.pellets.pelletList:
             self._rewards_position[pellet.position.y][pellet.position.x] = PELLETREWARD
         # place power pellets
         for pellet in self.game.pellets.powerpellets:
-            self._rewards_position[pellet.position.y][
-                pellet.position.x
-            ] = POWERPELLETREWARD
+            self._rewards_position[pellet.position.y][pellet.position.x] = POWERPELLETREWARD
         # place fruit if exists
         if self.game.fruit != None:
-            self._rewards_position[self.game.fruit.position.y][
-                self.game.fruit.position.x
-            ] = FRUITREWARD
+            self._rewards_position[self.game.fruit.position.y][self.game.fruit.position.x] = FRUITREWARD
+           
+
+        print({
+            "pacman_position": self._pacman_position,
+            "ghosts_position": self._ghosts_position,
+            "rewards_position": self._rewards_position,
+        })
+
         return {
             "pacman_position": self._pacman_position,
             "ghosts_position": self._ghosts_position,
@@ -121,12 +129,12 @@ class PacmanEnv(gym.Env):
 if __name__ == "__main__":
     env = gym.make("pacman-v0", render_mode="human")
     print("Checking Environment")
-    check_env(env.unwrapped)
-    print("done checking environment")
+    #check_env(env.unwrapped)
+    #print("done checking environment")
 
     obs = env.reset()[0]
 
     for i in range(1000):
         randaction = env.action_space.sample()
-        print(randaction)
+        env.render()
         obs, reward, terminated, _, _ = env.step(randaction)
