@@ -250,13 +250,13 @@ class GameController(object):
                     8,
                     time=1,
                 )
-                fruitCaptured = False
-                for fruit in self.fruitCaptured:
+                fruitcaptured = False
+                for fruit in self.fruitcaptured:
                     if fruit.get_offset() == self.fruit.image.get_offset():
-                        fruitCaptured = True
+                        fruitcaptured = True
                         break
-                if not fruitCaptured:
-                    self.fruitCaptured.append(self.fruit.image)
+                if not fruitcaptured:
+                    self.fruitcaptured.append(self.fruit.image)
                 self.fruit = None
             elif self.fruit.destroy:
                 self.fruit = None
@@ -274,9 +274,9 @@ class GameController(object):
             y = SCREENHEIGHT - self.lifesprites.images[i].get_height()
             self.screen.blit(self.lifesprites.images[i], (x, y))
         for i in range(len(self.fruitcaptured)):
-            x = SCREENWIDTH - self.fruitCaptured[i].get_width() * (i + 1)
-            y = SCREENHEIGHT - self.fruitCaptured[i].get_height()
-            self.screen.blit(self.fruitCaptured[i], (x, y))
+            x = SCREENWIDTH - self.fruitcaptured[i].get_width() * (i + 1)
+            y = SCREENHEIGHT - self.fruitcaptured[i].get_height()
+            self.screen.blit(self.fruitcaptured[i], (x, y))
         pygame.display.update()
 
 
