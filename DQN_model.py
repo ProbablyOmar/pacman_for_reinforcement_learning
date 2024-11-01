@@ -4,21 +4,21 @@ from keras.optimizers import Adam
 import numpy as np
 from collections import deque
 import time
-from DQN_model.modified_tensor_board import ModifiedTensorBoard
+from modified_tensor_board import ModifiedTensorBoard
+from constants import *
 import random
 
 class DQN_model ():
-    def __init__ (self , observation_space_shape , action_space_size):
+    def __init__ (self):
         self.replay_memory_size = 50_000
         self.min_replay_mem_size = 1_000
 
         self.batch_size = 64
         self.input_shape = 5 + SCREENHEIGHT * SCREENWIDTH
+        self.output_shape = 5
 
         self.discount_factor = 0.99
 
-        self.observation_space_shape = observation_space_shape
-        self.action_space_size = action_space_size
         self.MODEL_NAME = "DQN_pacman_model"
 
         self.model = self.create_model()
@@ -55,7 +55,7 @@ class DQN_model ():
         model.add(Dense(units = 8, activation = "relu"))
         model.add(Dropout(0.2))
 
-        model.add(Dense(units = 5, activation = "sigmoid"))
+        model.add(Dense(units = self.output_shape, activation = "sigmoid"))
         model.add(Dropout(0.2))
 
         model.compile(loss="mse", optimizer=Adam(learning_rate=0.001), metrics=['accuracy'])
@@ -65,18 +65,18 @@ class DQN_model ():
         self.replay_memory.append(experience)
 
     def get_qs (self , state):
-        return(self.model.predict(state.reshape(-1 , *state.shape) / 255))
+        return(self.model.predict(state.reshape(-1 , *state.shape)))[0]
 
-    def train (self , terminal_state):
-        if len(self.replay_memory) < self.min_replay_mem_size or not terminal_state:
+    def train (self):
+        if len(self.replay_memory) < self.min_replay_mem_size:
             return
 
-        exps_batch = self.random.sample(self.replay_memory , self.batch_size)
+        exps_batch = random.sample(self.replay_memory , self.batch_size)
 
-        current_states = np.array ([exp[0] for exp in exps_batch]) / 255
+        current_states = np.array ([exp[0] for exp in exps_batch])
         current_qs = self.model.predict(current_states)
 
-        future_states = np.array ([exp[2] for exp in exps_batch]) / 255
+        future_states = np.array ([exp[2] for exp in exps_batch])
         future_qs = self.target_model.predict(future_states)
 
         x = []
@@ -95,7 +95,7 @@ class DQN_model ():
             x.append(curr_state)
             y.append(real_qs)
 
-        self.model.fit(np.array(x)/255 , np.array(y) , batch_size = self.batch_size , callbacks=[self.tensorboard] , verbose=0, shuffle=False if terminal_state else None)
+        self.model.fit(np.array(x) , np.array(y) , batch_size = self.batch_size , callbacks=[self.tensorboard] , verbose=0, shuffle=False if terminal_state else None)
 
         if terminal_state:
             self.target_update_ctr += 1

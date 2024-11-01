@@ -7,13 +7,17 @@ import numpy as np
 from gymnasium import spaces
 from run import GameController
 from constants import *
+from DQN_model import DQN_model
+from tqdm import tqdm
+import time
+import random
 
 NOREWARD = 0
 PELLETREWARD = 1
 POWERPELLETREWARD = 2
 FRUITREWARD = 3
 
-GHOST_MODES = {SCATTER : 0 , CHASE : 0 , FREIGHT : 1  , SPAWN : 2}
+GHOST_MODES = {SCATTER: 0, CHASE: 0, FREIGHT: 1, SPAWN: 2}
 
 
 if "pacman-v0" not in gym.envs.registry:
@@ -30,6 +34,7 @@ class PacmanEnv(gym.Env):
         for i in list(range(ghosts_position_max.shape[0])):
             ghosts_position_max[i][0] = SCREENWIDTH
             ghosts_position_max[i][1] = SCREENHEIGHT
+            ghosts_position_max[i][2] = GHOST_MODES[SPAWN]
 
         rewards_position_max = np.empty((SCREENHEIGHT, SCREENWIDTH), dtype=int)
         for y in list(range(rewards_position_max.shape[0])):
@@ -54,6 +59,7 @@ class PacmanEnv(gym.Env):
         self._pacman_position = np.array([0, 0])
         self._ghosts_position = np.zeros((NUMGHOSTS, 3), dtype=int)
         self._rewards_position = np.zeros((SCREENHEIGHT, SCREENWIDTH), dtype=int)
+        self._fruit_position = None
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -69,26 +75,37 @@ class PacmanEnv(gym.Env):
             self._ghosts_position[i][:2] = np.array(
                 self.game.ghosts.ghosts[i].position.asInt(), int
             )
-            self._ghosts_position[i][2] = GHOST_MODES[self.game.ghosts.ghosts[i].mode.current]
-                
+            self._ghosts_position[i][2] = GHOST_MODES[
+                self.game.ghosts.ghosts[i].mode.current
+            ]
+
         # place pellets
         for pellet in self.game.pellets.pelletList:
             self._rewards_position[pellet.position.y][pellet.position.x] = PELLETREWARD
         # place power pellets
         for pellet in self.game.pellets.powerpellets:
-            self._rewards_position[pellet.position.y][pellet.position.x] = POWERPELLETREWARD
+            self._rewards_position[pellet.position.y][
+                pellet.position.x
+            ] = POWERPELLETREWARD
         # place fruit if exists
-        if self.game.fruit != None:
-            self._rewards_position[self.game.fruit.position.y][self.game.fruit.position.x] = FRUITREWARD
-           
-        """
-        print({
-            "pacman_position": self._pacman_position,
-            "ghosts_position": self._ghosts_position,
-            "rewards_position": self._rewards_position,
-        })
-        """
+        if self.game.fruit != None and self._fruit_position is None:
+            self._fruit_position = self.game.fruit.position.copy()
+            self._rewards_position[int(self._fruit_position.y)][
+                int(self._fruit_position.x)
+            ] = FRUITREWARD
+        elif self.game.fruit == None and not (self._fruit_position is None):
+            self._rewards_position[int(self._fruit_position.y)][
+                int(self._fruit_position.x)
+            ] = NOREWARD
+            self._fruit_position = None
 
+        """
+        for y in list(range(self._rewards_position.shape[0])):
+            for x in list(range(self._rewards_position.shape[1])):
+                if self._rewards_position[y][x] not in [0]:
+                    print(x, y)
+                    print(self._rewards_position[y][x])
+        """
         return {
             "pacman_position": self._pacman_position,
             "ghosts_position": self._ghosts_position,
@@ -105,11 +122,9 @@ class PacmanEnv(gym.Env):
 
     def step(self, action):
         if self.render_mode == "human":
-            self.game.update(action, render=True, clocktick=self.metadata["render_fps"])
+            self.game.update(agent_direction=action, render=True, clocktick=self.metadata["render_fps"])
         else:
-            self.game.update(
-                action, render=False, clocktick=self.metadata["render_fps"]
-            )
+            self.game.update(agent_direction=action, render=False, clocktick=self.metadata["render_fps"])
 
         terminated = self.game.gameOver
         reward = self.game.RLreward
@@ -127,15 +142,81 @@ class PacmanEnv(gym.Env):
             pygame.event.post(pygame.event.Event(QUIT))
 
 
+def get_model_obs (dict_state):
+        model_state = np.array([])
+
+        for val in dict_state.values():
+            model_state = np.append(model_state , val)
+
+        return model_state
+
 if __name__ == "__main__":
-    env = gym.make("pacman-v0", render_mode="human")
-    #print("Checking Environment")
-    #check_env(env.unwrapped)
-    #print("done checking environment")
+    env_not_render = gym.make("pacman-v0")
+    env_render = gym.make("pacman-v0" , render_mode = "human")
+    env = env_not_render
 
-    obs = env.reset()[0]
+    model = DQN_model()
+    EPISODES = 20_000
 
-    while True: 
-        randaction = env.action_space.sample()
-        env.render()
-        obs, reward, terminated, _, _ = env.step(randaction)
+    EPSILON = 1
+    EPSILON_DECAY = 0.99975
+    MIN_EPSILON = 0.001 
+
+    SHOW = True
+    SHOW_EVERY = 50
+    RENDER = None
+    EPISODES_REWARDS = []
+    MIN_REWARD = 10*120 - 50*5  # eaten half of the pellets before being eaten 5 times by ghosts
+
+    for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
+        model.tensorboard.step = episode
+
+        episode_reward = 0
+
+        curr_state , info = env.reset()
+        curr_state = get_model_obs(curr_state)
+
+        done = False
+
+        while not done :
+            if np.random.random() > EPSILON :
+                action = model.get_qs(curr_state)
+                action = np.argmax(action)
+                action -= 2
+            else:
+                action = random.randint(-2,2)
+
+            new_state, reward, terminated, truncated , info = env.step(action = action)
+            new_state = get_model_obs(new_state)
+            done = terminated or truncated
+
+            episode_reward += reward
+
+            model.update_replay_memory((curr_state , action , new_state , reward , done))
+            if done :
+                model.train()
+
+            if SHOW and not episode % SHOW_EVERY:
+                env = env_render
+            else:
+                env = env_not_render
+
+            curr_state = new_state
+
+        EPISODES_REWARDS.append(episode_reward)
+
+        if not episode % SHOW_EVERY:
+            avg_reward = sum(EPISODES_REWARDS[-SHOW_EVERY:]) / len(EPISODES_REWARDS[-SHOW_EVERY:])
+            min_reward = min(EPISODES_REWARDS[-SHOW_EVERY:])
+            max_reward = max(EPISODES_REWARDS[-SHOW_EVERY:])
+            model.tensorboard.update_stats(reward_avg=avg_reward, reward_min=min_reward, reward_max=max_reward, epsilon=EPSILON)
+
+        if min_reward >= MIN_REWARD:
+            model.model.save(f'models/{model.MODEL_NAME}__{max_reward:_>7.2f}max_{avg_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+
+        if EPSILON > MIN_EPSILON:
+            EPSILON *= EPSILON_DECAY
+            EPSILON = max(MIN_EPSILON , EPSILON)
+
+
+

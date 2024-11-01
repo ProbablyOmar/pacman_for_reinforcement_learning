@@ -63,11 +63,11 @@ class GameController(object):
 
     def nextLevel(self):
         self.showEntities()
-        self.level += 1
         if self.level > NUMBEROFLEVELS:
             self.gameOver = True
         self.pause.pasued = True
-        self.startGame()
+        self.restartGame()
+        self.level += 1
         self.textgroup.updateLevel(self.level)
 
     def setBackground(self):
@@ -278,10 +278,10 @@ class GameController(object):
             y = SCREENHEIGHT - self.fruitcaptured[i].get_height()
             self.screen.blit(self.fruitcaptured[i], (x, y))
         pygame.display.update()
-
+9
 
 if __name__ == "__main__":
-    game = GameController()
+    game = GameController(rlTraining=True)
     game.startGame()
     while True:
         game.update(render=True)
