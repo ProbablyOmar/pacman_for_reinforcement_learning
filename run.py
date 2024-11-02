@@ -40,6 +40,7 @@ class GameController(object):
         self.gameOver = False
 
     def restartGame(self):
+        self.gameOver = False
         self.lives = 5
         self.level = 0
         self.pause.paused = not self.rlTraining
@@ -54,6 +55,7 @@ class GameController(object):
         self.fruitcaptured = []
 
     def resetLevel(self):
+        self.gameOver = False
         self.pause.paused = not self.rlTraining
         self.pacman.reset()
         self.ghosts.reset()

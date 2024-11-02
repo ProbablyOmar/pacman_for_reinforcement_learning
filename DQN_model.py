@@ -5,6 +5,7 @@ import numpy as np
 from collections import deque
 import time
 from modified_tensor_board import ModifiedTensorBoard
+from keras.callbacks import TensorBoard
 from constants import *
 import random
 
@@ -14,7 +15,7 @@ class DQN_model ():
         self.min_replay_mem_size = 1_000
 
         self.batch_size = 64
-        self.input_shape = 5 + SCREENHEIGHT * SCREENWIDTH
+        self.input_shape = 2 + 4*3 + SCREENHEIGHT * SCREENWIDTH
         self.output_shape = 5
 
         self.discount_factor = 0.99
@@ -26,7 +27,7 @@ class DQN_model ():
         self.target_model.set_weights(self.model.get_weights())
 
         self.replay_memory = deque(maxlen= self.replay_memory_size)
-        self.tensorboard = ModifiedTensorBoard(log_dir="logs/{}-{}".format(self.MODEL_NAME, int(time.time())))
+        self.tensorboard = TensorBoard(log_dir="logs/{}-{}".format(self.MODEL_NAME, int(time.time())))
 
         self.target_update_ctr = 0
         self.target_update_period = 5
@@ -95,10 +96,10 @@ class DQN_model ():
             x.append(curr_state)
             y.append(real_qs)
 
-        self.model.fit(np.array(x) , np.array(y) , batch_size = self.batch_size , callbacks=[self.tensorboard] , verbose=0, shuffle=False if terminal_state else None)
+        self.model.fit(np.array(x) , np.array(y) , batch_size = self.batch_size , callbacks=[self.tensorboard] , verbose=0, shuffle=False)
 
-        if terminal_state:
-            self.target_update_ctr += 1
+
+        self.target_update_ctr += 1
 
         if self.target_update_ctr >= self.target_update_period:
             self.target_model.set_weights(self.model.get_weights())
