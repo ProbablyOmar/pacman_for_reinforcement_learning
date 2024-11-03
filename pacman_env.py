@@ -11,11 +11,8 @@ from DQN_model import DQN_model
 from tqdm import tqdm
 import time
 import random
+from enviromentConstants import *
 
-NOREWARD = 0
-PELLETREWARD = 1
-POWERPELLETREWARD = 2
-FRUITREWARD = 3
 
 GHOST_MODES = {SCATTER: 0, CHASE: 0, FREIGHT: 1, SPAWN: 2}
 
@@ -36,7 +33,9 @@ class PacmanEnv(gym.Env):
             ghosts_position_max[i][1] = SCREENHEIGHT
             ghosts_position_max[i][2] = GHOST_MODES[SPAWN]
 
-        rewards_position_max = np.empty((200, 3), dtype=int)
+        rewards_position_max = np.empty(
+            (REWARDS_ARRAY_NROWS, REWARDS_ARRAY_NCOLS), dtype=int
+        )
         for y in list(range(rewards_position_max.shape[0])):
             rewards_position_max[y] = [SCREENWIDTH, SCREENHEIGHT, FRUITREWARD]
 
@@ -49,7 +48,10 @@ class PacmanEnv(gym.Env):
                     0, ghosts_position_max, (NUMGHOSTS, 3), dtype=int
                 ),
                 "rewards_position": spaces.Box(
-                    0, rewards_position_max, (200, 3), dtype=int
+                    0,
+                    rewards_position_max,
+                    (REWARDS_ARRAY_NROWS, REWARDS_ARRAY_NCOLS),
+                    dtype=int,
                 ),
             }
         )
@@ -57,7 +59,9 @@ class PacmanEnv(gym.Env):
 
         self._pacman_position = np.array([0, 0])
         self._ghosts_position = np.zeros((NUMGHOSTS, 3), dtype=int)
-        self._rewards_position = np.zeros((200, 3), dtype=int)
+        self._rewards_position = np.zeros(
+            (REWARDS_ARRAY_NROWS, REWARDS_ARRAY_NCOLS), dtype=int
+        )
         self._fruit_position = None
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -105,14 +109,6 @@ class PacmanEnv(gym.Env):
             )
             self._fruit_position = None
 
-        # print(self._pacman_position.shape , self._ghosts_position.shape , self._rewards_position.shape)
-        """
-        for y in list(range(self._rewards_position.shape[0])):
-            for x in list(range(self._rewards_position.shape[1])):
-                if self._rewards_position[y][x] not in [0]:
-                    print(x, y)
-                    print(self._rewards_position[y][x])
-        """
         return {
             "pacman_position": self._pacman_position,
             "ghosts_position": self._ghosts_position,
