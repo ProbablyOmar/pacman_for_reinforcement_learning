@@ -82,19 +82,19 @@ class PacmanEnv(gym.Env):
                 self.game.ghosts.ghosts[i].mode.current
             ]
 
-        # place pellets
+        # place pellets and powerpellets
         row = 0
-        for pellet in self.game.pellets.pelletList:
-            self._rewards_position[row] = np.array(
-                [pellet.position.x, pellet.position.y, PELLETREWARD], int
-            )
-            row += 1
-        # place power pellets
         for pellet in self.game.pellets.powerpellets:
-            self._rewards_position[row] = np.array(
-                [pellet.position.x, pellet.position.y, POWERPELLETREWARD], int
-            )
+            if pellet.name == PELLET:
+                self._rewards_position[row] = np.array(
+                    [pellet.position.x, pellet.position.y, PELLETREWARD], int
+                )
+            elif pellet.name == POWERPELLET:
+                self._rewards_position[row] = np.array(
+                    [pellet.position.x, pellet.position.y, POWERPELLETREWARD], int
+                )
             row += 1
+
         # place fruit if exists
         if self.game.fruit != None and self._fruit_position is None:
             self._fruit_position = self.game.fruit.position.copy()
