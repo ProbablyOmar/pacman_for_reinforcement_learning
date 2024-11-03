@@ -144,8 +144,9 @@ class PacmanEnv(gym.Env):
             pygame.event.post(pygame.event.Event(QUIT))
 
 
+
 def get_model_obs (dict_state):
-        model_state = np.array([])
+        model_state = np.array([] , int)
 
         for val in dict_state.values():
             model_state = np.append(model_state , val)
@@ -159,6 +160,7 @@ if __name__ == "__main__":
 
     model = DQN_model()
     EPISODES = 20_000
+    #EPISODES = 10
 
     EPSILON = 1
     EPSILON_DECAY = 0.99975
@@ -169,6 +171,7 @@ if __name__ == "__main__":
     RENDER = None
     EPISODES_REWARDS = []
     MIN_REWARD = 10*120 - 50*5  # eaten half of the pellets before being eaten 5 times by ghosts
+    #MIN_REWARD = -20000
 
     for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
         #model.tensorboard.step = episode
@@ -213,13 +216,24 @@ if __name__ == "__main__":
             max_reward = max(EPISODES_REWARDS[-SHOW_EVERY:])
             #model.tensorboard.update_stats(reward_avg=avg_reward, reward_min=min_reward, reward_max=max_reward, epsilon=EPSILON)
 
+            ############################################
+            #if episode == 1:
+            #    model.model.save(f'models/{model.MODEL_NAME}__{max_reward:_>7.2f}max_{avg_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+            ############################################
+            ############################################
             if min_reward >= MIN_REWARD:
                 model.model.save(f'models/{model.MODEL_NAME}__{max_reward:_>7.2f}max_{avg_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
-
+            ############################################
         #print("epsilon: " , EPSILON)
         if EPSILON > MIN_EPSILON:
             EPSILON *= EPSILON_DECAY
             EPSILON = max(MIN_EPSILON , EPSILON)
+
+        del curr_state
+        del new_state
+    ############################################
+    #model.model.save(f'models/{model.MODEL_NAME}__{max_reward:_>7.2f}max_{avg_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+    ###########################################
 
 
 

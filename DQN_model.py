@@ -4,6 +4,7 @@ from keras.optimizers import Adam
 import numpy as np
 from collections import deque
 import time
+import datetime
 from modified_tensor_board import ModifiedTensorBoard
 from keras.callbacks import TensorBoard
 from constants import *
@@ -27,8 +28,8 @@ class DQN_model ():
         self.target_model.set_weights(self.model.get_weights())
 
         self.replay_memory = deque(maxlen= self.replay_memory_size)
-        self.tensorboard = TensorBoard(log_dir="logs/{}-{}".format(self.MODEL_NAME, int(time.time())))
-
+        #self.tensorboard = TensorBoard(log_dir="logs/{}-{}".format(self.MODEL_NAME, datetime.datetime.now().strftime("%Y%m%d-%H%M%S")) , histogram_freq=2)
+        self.tensorboard = TensorBoard(log_dir="logs/{}-{}".format(self.MODEL_NAME, time.time()))
         self.target_update_ctr = 0
         self.target_update_period = 5
 
