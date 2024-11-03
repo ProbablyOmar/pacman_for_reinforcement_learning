@@ -57,7 +57,7 @@ class PacmanEnv(gym.Env):
 
         self._pacman_position = np.array([0, 0])
         self._ghosts_position = np.zeros((NUMGHOSTS, 3), dtype=int)
-        self._rewards_position = np.zeros((SCREENHEIGHT, SCREENWIDTH), dtype=int)
+        self._rewards_position = np.zeros((200, 3), dtype=int)
         self._fruit_position = None
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
