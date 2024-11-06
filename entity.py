@@ -29,6 +29,7 @@ class Entity(object):
 
     def setPosition(self):
         self.position = self.node.position.copy()
+        self.tile = (int((self.position.x // TILEWIDTH) - 1), int((self.position.y // TILEHEIGHT) - 4))
 
     def setStartNode(self, node):
         self.node = node
@@ -70,7 +71,17 @@ class Entity(object):
         if len(directions) == 0:
             directions.append(self.direction * -1)
         return directions
-
+    """
+    def validAgentDirections(self):
+        directions = []
+        for key in [UP, LEFT]:
+            if self.validDirection(key):
+                directions.append(key+1)
+        for key in [RIGHT , DOWN]:
+            if self.validDirection(key):
+                directions.append(key+2)
+        return directions
+    """
     def randomDirection(self, directions):
         return directions[randint(0, len(directions) - 1)]
 

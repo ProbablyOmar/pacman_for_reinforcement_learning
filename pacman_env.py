@@ -12,6 +12,7 @@ from tqdm import tqdm
 import time
 import random
 from enviromentConstants import *
+import matplotlib.pyplot as plt
 
 
 GHOST_MODES = {SCATTER: 0, CHASE: 0, FREIGHT: 1, SPAWN: 2}
@@ -27,42 +28,29 @@ class PacmanEnv(gym.Env):
     def __init__(self, render_mode=None):
         self.game = GameController(rlTraining=True)
 
-        ghosts_position_max = np.empty((NUMGHOSTS, 3), dtype=int)
-        for i in list(range(ghosts_position_max.shape[0])):
-            ghosts_position_max[i][0] = SCREENWIDTH
-            ghosts_position_max[i][1] = SCREENHEIGHT
-            ghosts_position_max[i][2] = GHOST_MODES[SPAWN]
-
-        rewards_position_max = np.empty(
-            (REWARDS_ARRAY_NROWS, REWARDS_ARRAY_NCOLS), dtype=int
-        )
-        for y in list(range(rewards_position_max.shape[0])):
-            rewards_position_max[y] = [SCREENWIDTH, SCREENHEIGHT, FRUITREWARD]
-
         self.observation_space = spaces.Dict(
             {
-                "pacman_position": spaces.Box(
-                    0, np.array([SCREENWIDTH, SCREENHEIGHT]), dtype=int
+                "walls_position": spaces.Box(
+                    low = np.array([0,0,0,0]), high = np.array([1,1,1,1]), dtype=np.bool_
+                ),
+                "best_direction": spaces.Box(
+                    low = np.array([-2]), high = np.array([2]) , dtype=np.int_
                 ),
                 "ghosts_position": spaces.Box(
-                    0, ghosts_position_max, (NUMGHOSTS, 3), dtype=int
+                    low = np.array([0,0,0,0]), high = np.array([1,1,1,1]), dtype=np.bool_
                 ),
-                "rewards_position": spaces.Box(
-                    0,
-                    rewards_position_max,
-                    (REWARDS_ARRAY_NROWS, REWARDS_ARRAY_NCOLS),
-                    dtype=int,
-                ),
+                "trapped": spaces.Box(
+                    low = np.array([False]), high = np.array([True]) , dtype=np.bool_
+                )
             }
         )
         self.action_space = spaces.Discrete(5, start=-2)
 
-        self._pacman_position = np.array([0, 0])
-        self._ghosts_position = np.zeros((NUMGHOSTS, 3), dtype=int)
-        self._rewards_position = np.zeros(
-            (REWARDS_ARRAY_NROWS, REWARDS_ARRAY_NCOLS), dtype=int
-        )
-        self._fruit_position = None
+        self._walls_position = np.array([0, 0 , 0 , 0], dtype=np.bool_)
+        self._best_direction = np.array([0] , dtype=np.int_)
+        self._ghosts_position = np.array([0, 0 , 0 , 0], dtype=np.bool_)
+        self._trapped = np.array([True], dtype=np.bool_)
+
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -72,47 +60,29 @@ class PacmanEnv(gym.Env):
 
     def _getobs(self):
         self._action_to_direction = self.game.pacman.directions
-        self._pacman_position = np.array(self.game.pacman.position.asInt(), int)
+        self._walls_position , self._ghosts_position , ghosts_rewards = self.game.observation
 
-        for i in list(range(self._ghosts_position.shape[0])):
-            self._ghosts_position[i][:2] = np.array(
-                self.game.ghosts.ghosts[i].position.asInt(), int
-            )
-            self._ghosts_position[i][2] = GHOST_MODES[
-                self.game.ghosts.ghosts[i].mode.current
-            ]
+        max_ghost_avoidance = max(ghosts_rewards[direction][1] for direction in ghosts_rewards)
+        filtered_dir = {direction : val for direction , val in ghosts_rewards.items() if val[1] == max_ghost_avoidance}
+        best_dir = max(filtered_dir, key=lambda direction: filtered_dir[direction][0])
+        self._best_direction = np.array([best_dir])
 
-        # place pellets and powerpellets
-        row = 0
-        for pellet in self.game.pellets.powerpellets:
-            if pellet.name == PELLET:
-                self._rewards_position[row] = np.array(
-                    [pellet.position.x, pellet.position.y, PELLETREWARD], int
-                )
-            elif pellet.name == POWERPELLET:
-                self._rewards_position[row] = np.array(
-                    [pellet.position.x, pellet.position.y, POWERPELLETREWARD], int
-                )
-            row += 1
+        trapped = not(any(val[1] in [100,101] for val in ghosts_rewards.values()))
+        self._trapped = np.array([trapped])
 
-        # place fruit if exists
-        if self.game.fruit != None and self._fruit_position is None:
-            self._fruit_position = self.game.fruit.position.copy()
-            self._rewards_position[row] = np.array(
-                [int(self._fruit_position.x), int(self._fruit_position.y), FRUITREWARD],
-                int,
-            )
-        elif self.game.fruit == None and not (self._fruit_position is None):
-            self._rewards_position[row] = np.array(
-                [int(self._fruit_position.x), int(self._fruit_position.y), NOREWARD],
-                int,
-            )
-            self._fruit_position = None
-
+        """
+        print({
+            "walls_position": self._walls_position,
+            "best_direction": self._best_direction,
+            "ghosts_position" :  self._ghosts_position,
+            "trapped": self._trapped
+        })
+        """
         return {
-            "pacman_position": self._pacman_position,
-            "ghosts_position": self._ghosts_position,
-            "rewards_position": self._rewards_position,
+            "walls_position": self._walls_position,
+            "best_direction": self._best_direction,
+            "ghosts_position" :  self._ghosts_position,
+            "trapped": self._trapped
         }
 
     def reset(self, seed=None, options=None):
@@ -142,7 +112,6 @@ class PacmanEnv(gym.Env):
         reward = self.game.RLreward
         observation = self._getobs()
         info = {}
-
         return observation, reward, terminated, truncated, info
 
     def render(self):
@@ -169,19 +138,25 @@ if __name__ == "__main__":
     env = env_not_render
 
     model = DQN_model()
-    EPISODES = 20_000
+    #EPISODES = 20_000
+    EPISODES = 10
 
     EPSILON = 1
     EPSILON_DECAY = 0.99975
     MIN_EPSILON = 0.001
 
     SHOW = True
-    SHOW_EVERY = 50
+    #SHOW_EVERY = 50
+    SHOW_EVERY = 2
+
     RENDER = None
     EPISODES_REWARDS = []
-    MIN_REWARD = (
-        10 * 120 - 50 * 5
-    )  # eaten half of the pellets before being eaten 5 times by ghosts
+    min_avg_reward = -1000
+
+    min_rews = []
+    max_rews = []
+    avg_rews = []
+    num_steps = []
 
     for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit="episodes"):
         # model.tensorboard.step = episode
@@ -194,8 +169,10 @@ if __name__ == "__main__":
         curr_state = get_model_obs(curr_state)
         episode_reward = 0
         done = False
+        steps = 0
 
         while not done:
+            steps += 1
             # print("done: " , done)
             if np.random.random() > EPSILON:
                 action = model.get_qs(curr_state)
@@ -217,7 +194,8 @@ if __name__ == "__main__":
                 # print("**********************training**********************")
 
             curr_state = new_state
-
+        
+        num_steps.append(steps)
         EPISODES_REWARDS.append(episode_reward)
 
         if not episode % SHOW_EVERY:
@@ -228,12 +206,38 @@ if __name__ == "__main__":
             max_reward = max(EPISODES_REWARDS[-SHOW_EVERY:])
             # model.tensorboard.update_stats(reward_avg=avg_reward, reward_min=min_reward, reward_max=max_reward, epsilon=EPSILON)
 
-            if min_reward >= MIN_REWARD:
+            min_rews.append(min_reward)
+            max_rews.append(max_reward)
+            avg_rews.append(avg_reward)
+            print("Avg reward: " , avg_reward)
+            print("min reward: " , min_reward)
+            print("max reward: " , max_reward)
+
+            if avg_reward >= min_avg_reward:
                 model.model.save(
-                    f"models/{model.MODEL_NAME}__{max_reward:_>7.2f}max_{avg_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model"
+                    f"models/{model.MODEL_NAME}__{max_reward:_>7.2f}max_{avg_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.h5"
                 )
+                min_avg_reward = avg_reward
 
         # print("epsilon: " , EPSILON)
         if EPSILON > MIN_EPSILON:
             EPSILON *= EPSILON_DECAY
             EPSILON = max(MIN_EPSILON, EPSILON)
+
+
+    episodes_divs = np.arange(SHOW_EVERY, EPISODES + 1, SHOW_EVERY)
+    episodes = np.arange(1, EPISODES + 1)
+
+    plt.figure(figsize=(12, 8))
+
+    plt.plot(episodes_divs, avg_rews, label="Average Reward", color="blue")
+    plt.plot(episodes_divs, min_rews, label="Minimum Reward", color="red")
+    plt.plot(episodes_divs, max_rews, label="Maximum Reward", color="green")
+    plt.plot(episodes, num_steps, label="Number Of Steps", color="yellow")
+
+    plt.xlabel("Episode")
+    plt.title("Reward Metrics Every 50 Episodes")
+    plt.legend(loc="best")
+    plt.show()
+
+

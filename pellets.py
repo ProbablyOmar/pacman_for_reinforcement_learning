@@ -8,6 +8,8 @@ class Pellet(object):
     def __init__(self, row, column):
         self.name = PELLET
         self.position = Vector2(column * TILEWIDTH, row * TILEHEIGHT)
+        self.tile = (int((self.position.x // TILEWIDTH) - 1), int((self.position.y // TILEHEIGHT) - 4))
+
         self.color = WHITE
         self.radius = int(2 * TILEWIDTH / 16)
         self.collideRadius = int(2 * TILEWIDTH / 16)
@@ -41,8 +43,16 @@ class PelletGroup(object):
     def __init__(self, pelletfile) -> None:
         self.pelletList = []
         self.powerpellets = []
-        self.createPelletList(pelletfile)
         self.numEaten = 0
+        self.set_maze_pellets_map()
+        self.createPelletList(pelletfile)
+
+    def set_maze_pellets_map (self):
+        self.map_init_pell_rewards = np.empty((GAME_ROWS,GAME_COLS), dtype=object)
+        for row in range (GAME_ROWS):
+            for col in range (GAME_COLS):
+                self.map_init_pell_rewards[row][col] = np.array([0,0]) #first index is for rewards in this tile ,  second is for the ghost penality in the tile
+        
 
     def update(self, dt):
         for powerpellet in self.powerpellets:
@@ -53,12 +63,19 @@ class PelletGroup(object):
         for row in list(range(data.shape[0])):
             for col in list(range(data.shape[1])):
                 if data[row][col] in [".", "+"]:
-                    self.pelletList.append(Pellet(row, col))
+                    pel = Pellet(row, col)
+                    self.pelletList.append(pel)
+                    ### put the pellets reward in the maze
+                    self.map_init_pell_rewards[pel.tile[1]][pel.tile[0]][0] = pel.points
+                    ###
                 elif data[row][col] in ["P", "p"]:
                     pp = PowerPellet(row, col)
                     self.pelletList.append(pp)
                     self.powerpellets.append(pp)
 
+                    ### put the power pellets reward in the maze
+                    self.map_init_pell_rewards[pp.tile[1]][pp.tile[0]][0] = pp.points
+                    ###
     def readPelletfile(self, pelletfile):
         return np.loadtxt(pelletfile, dtype="<U1")
 

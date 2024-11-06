@@ -1,5 +1,5 @@
 from keras.models import Sequential
-from keras.layers import Conv2D, Dense, Dropout, MaxPooling2D, Activation, Flatten
+from keras.layers import Conv2D, Dense, Dropout, MaxPooling2D, Activation, Flatten , InputLayer
 from keras.optimizers import Adam
 import numpy as np
 from collections import deque
@@ -17,7 +17,7 @@ class DQN_model:
         self.min_replay_mem_size = 1_000
 
         self.batch_size = 64
-        self.input_shape = 2 + 4 * 3 + REWARDS_ARRAY_NROWS * REWARDS_ARRAY_NCOLS
+        self.input_shape = 10
         self.output_shape = 5
 
         self.discount_factor = 0.99
@@ -39,14 +39,7 @@ class DQN_model:
     def create_model(self):
         model = Sequential()
 
-        model.add(Dense(units=1024, activation="relu", input_shape=(self.input_shape,)))
-        model.add(Dropout(0.2))
-
-        model.add(Dense(units=512, activation="relu"))
-        model.add(Dropout(0.2))
-
-        model.add(Dense(units=128, activation="relu"))
-        model.add(Dropout(0.2))
+        model.add(InputLayer(shape=(self.input_shape,)))
 
         model.add(Dense(units=64, activation="relu"))
         model.add(Dropout(0.2))
@@ -57,10 +50,16 @@ class DQN_model:
         model.add(Dense(units=16, activation="relu"))
         model.add(Dropout(0.2))
 
+        model.add(Dense(units=16, activation="relu"))
+        model.add(Dropout(0.2))
+
         model.add(Dense(units=8, activation="relu"))
         model.add(Dropout(0.2))
 
-        model.add(Dense(units=self.output_shape, activation="sigmoid"))
+        model.add(Dense(units=8, activation="relu"))
+        model.add(Dropout(0.2))
+
+        model.add(Dense(units=self.output_shape, activation="linear"))
         model.add(Dropout(0.2))
 
         model.compile(
