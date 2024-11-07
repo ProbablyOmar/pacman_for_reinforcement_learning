@@ -123,6 +123,7 @@ class GameController(object):
         self.mazedata.obj.denyGhostsAccess(self.ghosts, self.nodes)
 
     def update(self, agent_direction=None, render=True, clocktick=60):
+        self.RLreward = 0
         dt = self.clock.tick(clocktick) / 1000.0
         self.textgroup.update(dt)
         self.pellets.update(dt)
