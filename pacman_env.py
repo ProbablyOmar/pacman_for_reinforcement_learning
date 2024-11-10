@@ -13,6 +13,7 @@ import time
 import random
 from enviromentConstants import *
 import matplotlib.pyplot as plt
+import os
 
 
 GHOST_MODES = {SCATTER: 0, CHASE: 0, FREIGHT: 1, SPAWN: 2}
@@ -107,7 +108,7 @@ class PacmanEnv(gym.Env):
                 clocktick=self.metadata["render_fps"],
             )
 
-        terminated = self.game.gameOver
+        terminated = self.game.done
         truncated = False
         reward = self.game.RLreward
         observation = self._getobs()
@@ -133,21 +134,21 @@ def get_model_obs(dict_state):
 
 
 if __name__ == "__main__":
-    env_not_render = gym.make("pacman-v0")
-    env_render = gym.make("pacman-v0", render_mode="human")
+    env_not_render = gym.make("pacman-v0", max_episode_steps = 500)
+    env_render = gym.make("pacman-v0", render_mode = "human")
     env = env_not_render
 
     model = DQN_model()
-    #EPISODES = 20_000
-    EPISODES = 10
+    EPISODES = 20_000
+    #EPISODES = 2
 
     EPSILON = 1
-    EPSILON_DECAY = 0.99975
+    EPSILON_DECAY = 0.997
     MIN_EPSILON = 0.001
 
     SHOW = True
-    #SHOW_EVERY = 50
     SHOW_EVERY = 2
+    #SHOW_EVERY = 1
 
     RENDER = None
     EPISODES_REWARDS = []
@@ -157,9 +158,15 @@ if __name__ == "__main__":
     max_rews = []
     avg_rews = []
     num_steps = []
+    episode_num = 0
+
+    save_dir = "/graphs"
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
     for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit="episodes"):
-        # model.tensorboard.step = episode
+        episode_num +=1
+        model.tensorboard.step = episode
         if SHOW and not episode % SHOW_EVERY:
             env = env_render
         else:
@@ -194,7 +201,7 @@ if __name__ == "__main__":
                 # print("**********************training**********************")
 
             curr_state = new_state
-        
+
         num_steps.append(steps)
         EPISODES_REWARDS.append(episode_reward)
 
@@ -204,20 +211,42 @@ if __name__ == "__main__":
             )
             min_reward = min(EPISODES_REWARDS[-SHOW_EVERY:])
             max_reward = max(EPISODES_REWARDS[-SHOW_EVERY:])
-            # model.tensorboard.update_stats(reward_avg=avg_reward, reward_min=min_reward, reward_max=max_reward, epsilon=EPSILON)
+            model.tensorboard.update_stats(reward_avg=avg_reward, reward_min=min_reward, reward_max=max_reward, epsilon=EPSILON)
 
             min_rews.append(min_reward)
             max_rews.append(max_reward)
             avg_rews.append(avg_reward)
+
+            print("Episode: ** " , episode_num)
             print("Avg reward: " , avg_reward)
             print("min reward: " , min_reward)
             print("max reward: " , max_reward)
 
+
             if avg_reward >= min_avg_reward:
                 model.model.save(
-                    f"models/{model.MODEL_NAME}__{max_reward:_>7.2f}max_{avg_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.h5"
+                    f"models/{model.MODEL_NAME}__{max_reward:_>7.2f}max_{avg_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.keras"
                 )
                 min_avg_reward = avg_reward
+
+            #########################plotting#############################
+            episodes_divs = np.arange(SHOW_EVERY, episode_num + 1, SHOW_EVERY)
+            episodes = np.arange(1, episode_num + 1)
+
+            plt.figure(figsize=(12, 8))
+
+            plt.plot(episodes_divs, avg_rews, label="Average Reward", color="blue")
+            plt.plot(episodes_divs, min_rews, label="Minimum Reward", color="red")
+            plt.plot(episodes_divs, max_rews, label="Maximum Reward", color="green")
+            plt.plot(episodes, num_steps, label="Number Of Steps", color="black")
+
+            plt.xlabel("Episode")
+            plt.title("Reward Metrics Every 50 Episodes")
+            plt.legend(loc="best")
+            plot_filename = os.path.join(save_dir, "reward_metrics.png")
+            plt.savefig(plot_filename)
+            plt.show()
+            #################################################################
 
         # print("epsilon: " , EPSILON)
         if EPSILON > MIN_EPSILON:
@@ -225,19 +254,8 @@ if __name__ == "__main__":
             EPSILON = max(MIN_EPSILON, EPSILON)
 
 
-    episodes_divs = np.arange(SHOW_EVERY, EPISODES + 1, SHOW_EVERY)
-    episodes = np.arange(1, EPISODES + 1)
 
-    plt.figure(figsize=(12, 8))
 
-    plt.plot(episodes_divs, avg_rews, label="Average Reward", color="blue")
-    plt.plot(episodes_divs, min_rews, label="Minimum Reward", color="red")
-    plt.plot(episodes_divs, max_rews, label="Maximum Reward", color="green")
-    plt.plot(episodes, num_steps, label="Number Of Steps", color="yellow")
 
-    plt.xlabel("Episode")
-    plt.title("Reward Metrics Every 50 Episodes")
-    plt.legend(loc="best")
-    plt.show()
 
 

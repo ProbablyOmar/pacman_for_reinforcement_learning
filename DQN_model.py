@@ -29,8 +29,8 @@ class DQN_model:
         self.target_model.set_weights(self.model.get_weights())
 
         self.replay_memory = deque(maxlen=self.replay_memory_size)
-        self.tensorboard = TensorBoard(
-            log_dir="logs/{}-{}".format(self.MODEL_NAME, int(time.time()))
+        self.tensorboard = ModifiedTensorBoard(
+            log_dir="logs/fit/{}-{}".format(self.MODEL_NAME, int(time.time()))
         )
 
         self.target_update_ctr = 0
@@ -44,26 +44,22 @@ class DQN_model:
         model.add(Dense(units=64, activation="relu"))
         model.add(Dropout(0.2))
 
-        model.add(Dense(units=32, activation="relu"))
-        model.add(Dropout(0.2))
+        # model.add(Dense(units=32, activation="relu"))
+        # model.add(Dropout(0.2))
 
-        model.add(Dense(units=16, activation="relu"))
-        model.add(Dropout(0.2))
+        # model.add(Dense(units=16, activation="relu"))
+        # model.add(Dropout(0.2))
 
-        model.add(Dense(units=16, activation="relu"))
-        model.add(Dropout(0.2))
+        # model.add(Dense(units=16, activation="relu"))
+        # model.add(Dropout(0.2))
+
+        # model.add(Dense(units=8, activation="relu"))
+        # model.add(Dropout(0.2))
 
         model.add(Dense(units=8, activation="relu"))
-        model.add(Dropout(0.2))
-
-        model.add(Dense(units=8, activation="relu"))
-        model.add(Dropout(0.2))
-
         model.add(Dense(units=self.output_shape, activation="linear"))
-        model.add(Dropout(0.2))
-
         model.compile(
-            loss="mse", optimizer=Adam(learning_rate=0.001), metrics=["accuracy"]
+            loss="mse", optimizer=Adam(learning_rate=0.001)  ########### we can enhance the learning rate a little bit and see hat happens make it .01
         )
         return model
 
@@ -108,7 +104,7 @@ class DQN_model:
             np.array(y),
             batch_size=self.batch_size,
             callbacks=[self.tensorboard],
-            verbose=0,
+            verbose=False,
             shuffle=False,
         )
 

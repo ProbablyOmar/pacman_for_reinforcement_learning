@@ -40,12 +40,15 @@ class GameController(object):
         self.fruitcaptured = []
         self.mazedata = MazeData()
         self.gameOver = False
+        self.win = False
+        self.done = False
         self.startGame()
         
 
 
     def restartGame(self):
         self.gameOver = False
+        self.win = False
         self.lives = 5
         self.level = 0
         self.pause.paused = not self.rlTraining
@@ -61,6 +64,7 @@ class GameController(object):
 
     def resetLevel(self):
         self.gameOver = False
+        self.win = False
         self.pause.paused = not self.rlTraining
         self.pacman.reset()
         self.ghosts.reset()
@@ -134,6 +138,7 @@ class GameController(object):
         self.get_obs()
 
     def update(self, agent_direction=None, render=True, clocktick=60):
+        self.done = self.gameOver or self.win
         self.RLreward = 0
         dt = self.clock.tick(clocktick) / 1000.0
         self.textgroup.update(dt)
@@ -426,6 +431,7 @@ class GameController(object):
                 self.ghosts.startFreight()
 
         if self.pellets.isEmpty():
+            self.win = True
             self.flashBG = True
             self.hideEntities()
             self.pause.setPause(pauseTime=3, func=self.nextLevel)
