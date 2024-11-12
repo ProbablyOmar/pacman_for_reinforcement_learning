@@ -44,10 +44,10 @@ class DQN_model:
         model.add(Dense(units=64, activation="relu"))
         model.add(Dropout(0.2))
 
-        # model.add(Dense(units=32, activation="relu"))
+        model.add(Dense(units=32, activation="relu"))
         # model.add(Dropout(0.2))
 
-        # model.add(Dense(units=16, activation="relu"))
+        model.add(Dense(units=16, activation="relu"))
         # model.add(Dropout(0.2))
 
         # model.add(Dense(units=16, activation="relu"))
@@ -59,7 +59,7 @@ class DQN_model:
         model.add(Dense(units=8, activation="relu"))
         model.add(Dense(units=self.output_shape, activation="linear"))
         model.compile(
-            loss="mse", optimizer=Adam(learning_rate=0.001)  ########### we can enhance the learning rate a little bit and see hat happens make it .01
+            loss="mse", optimizer=Adam(learning_rate=0.01)  ########### we can enhance the learning rate a little bit and see hat happens make it .01
         )
         return model
 

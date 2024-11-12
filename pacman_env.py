@@ -8,11 +8,9 @@ from gymnasium import spaces
 from run import GameController
 from constants import *
 from DQN_model import DQN_model
-from tqdm import tqdm
-import time
-import random
 from enviromentConstants import *
-import matplotlib.pyplot as plt
+from stable_baselines3 import DQN
+from stable_baselines3.dqn import MultiInputPolicy
 import os
 
 
@@ -45,7 +43,7 @@ class PacmanEnv(gym.Env):
                 )
             }
         )
-        self.action_space = spaces.Discrete(5, start=-2)
+        self.action_space = spaces.Discrete(5, start=0)
 
         self._walls_position = np.array([0, 0 , 0 , 0], dtype=np.bool_)
         self._best_direction = np.array([0] , dtype=np.int_)
@@ -95,6 +93,7 @@ class PacmanEnv(gym.Env):
         return observation, info
 
     def step(self, action):
+        action -= 2
         if self.render_mode == "human":
             self.game.update(
                 agent_direction=action,
@@ -123,135 +122,56 @@ class PacmanEnv(gym.Env):
         if self.window is not None:
             pygame.event.post(pygame.event.Event(QUIT))
 
-
-def get_model_obs(dict_state):
-    model_state = np.array([])
-
-    for val in dict_state.values():
-        model_state = np.append(model_state, val)
-
-    return model_state
+def constant_lr(_):
+    return 1e-3  # Fixed learning rate of 0.001
 
 
 if __name__ == "__main__":
     env_not_render = gym.make("pacman-v0", max_episode_steps = 500)
-    env_render = gym.make("pacman-v0", render_mode = "human")
-    env = env_not_render
+    env_render = gym.make("pacman-v0", max_episode_steps = 500 , render_mode = "human")
+    
+    model_path = "./models/simple_DQN_baseline_model_40,000,000_steps_more_frequent_saving"
+    log_path = "./logs/fit"
 
-    model = DQN_model()
-    EPISODES = 20_000
-    #EPISODES = 2
-
-    EPSILON = 1
-    EPSILON_DECAY = 0.997
-    MIN_EPSILON = 0.001
-
-    SHOW = True
-    SHOW_EVERY = 2
-    #SHOW_EVERY = 1
-
-    RENDER = None
-    EPISODES_REWARDS = []
-    min_avg_reward = -1000
-
-    min_rews = []
-    max_rews = []
-    avg_rews = []
-    num_steps = []
-    episode_num = 0
-
-    save_dir = "/graphs"
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-
-    for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit="episodes"):
-        episode_num +=1
-        model.tensorboard.step = episode
-        if SHOW and not episode % SHOW_EVERY:
-            env = env_render
-        else:
-            env = env_not_render
-
-        curr_state, info = env.reset()
-        curr_state = get_model_obs(curr_state)
-        episode_reward = 0
-        done = False
-        steps = 0
-
-        while not done:
-            steps += 1
-            # print("done: " , done)
-            if np.random.random() > EPSILON:
-                action = model.get_qs(curr_state)
-                action = np.argmax(action)
-                action -= 2
-            else:
-                action = random.randint(-2, 2)
-
-            new_state, reward, terminated, truncated, info = env.step(action=action)
-            new_state = get_model_obs(new_state)
-            done = terminated
-
-            episode_reward += reward
-
-            model.update_replay_memory((curr_state, action, new_state, reward, done))
-            if done:
-                # print("done: " , done)
-                model.train()
-                # print("**********************training**********************")
-
-            curr_state = new_state
-
-        num_steps.append(steps)
-        EPISODES_REWARDS.append(episode_reward)
-
-        if not episode % SHOW_EVERY:
-            avg_reward = sum(EPISODES_REWARDS[-SHOW_EVERY:]) / len(
-                EPISODES_REWARDS[-SHOW_EVERY:]
-            )
-            min_reward = min(EPISODES_REWARDS[-SHOW_EVERY:])
-            max_reward = max(EPISODES_REWARDS[-SHOW_EVERY:])
-            model.tensorboard.update_stats(reward_avg=avg_reward, reward_min=min_reward, reward_max=max_reward, epsilon=EPSILON)
-
-            min_rews.append(min_reward)
-            max_rews.append(max_reward)
-            avg_rews.append(avg_reward)
-
-            print("Episode: ** " , episode_num)
-            print("Avg reward: " , avg_reward)
-            print("min reward: " , min_reward)
-            print("max reward: " , max_reward)
+    
+    if not os.path.exists(log_path):
+        os.makedirs(log_path)
 
 
-            if avg_reward >= min_avg_reward:
-                model.model.save(
-                    f"models/{model.MODEL_NAME}__{max_reward:_>7.2f}max_{avg_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.keras"
-                )
-                min_avg_reward = avg_reward
+    if not os.path.exists(model_path):  
+        os.makedirs(model_path)
+        env = env_not_render
+        obs , _ = env.reset()
+        #policy = MultiInputPolicy(env.observation_space , env.action_space , lr_schedule = constant_lr , net_arch = [64 , 32])
+        model = DQN("MultiInputPolicy" , env , verbose = 1 , tensorboard_log=log_path)
 
-            #########################plotting#############################
-            episodes_divs = np.arange(SHOW_EVERY, episode_num + 1, SHOW_EVERY)
-            episodes = np.arange(1, episode_num + 1)
+        time_steps = 400_000
+        for i in range (100):
+            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "simple_DQN_model_40,000,000_steps_more_frequent_saving")
+            model.save(f"{model_path}/{i*time_steps}")
 
-            plt.figure(figsize=(12, 8))
+    
 
-            plt.plot(episodes_divs, avg_rews, label="Average Reward", color="blue")
-            plt.plot(episodes_divs, min_rews, label="Minimum Reward", color="red")
-            plt.plot(episodes_divs, max_rews, label="Maximum Reward", color="green")
-            plt.plot(episodes, num_steps, label="Number Of Steps", color="black")
+    elif os.path.exists(model_path):
+        env = env_render
+        obs , _ = env.reset()
+        model_final_path = f"{model_path}/0.zip"
+        model = DQN.load(model_final_path , env = env)
 
-            plt.xlabel("Episode")
-            plt.title("Reward Metrics Every 50 Episodes")
-            plt.legend(loc="best")
-            plot_filename = os.path.join(save_dir, "reward_metrics.png")
-            plt.savefig(plot_filename)
-            plt.show()
-            #################################################################
+        episodes = 10
+        for ep in range(episodes):
+            done = False
+            while not done:
+                action , next_state = model.predict(obs)
+                obs, reward, terminated, truncated, info = env.step(int(action))
+                done = terminated
+        env.close()
 
-        # print("epsilon: " , EPSILON)
-        if EPSILON > MIN_EPSILON:
-            EPSILON *= EPSILON_DECAY
-            EPSILON = max(MIN_EPSILON, EPSILON)
+
+
+
+
+   
 
 
 

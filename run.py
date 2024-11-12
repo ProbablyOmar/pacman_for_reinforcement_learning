@@ -494,5 +494,5 @@ if __name__ == "__main__":
     game = GameController(rlTraining=True)
     while True:
         game.update(render=True)
-
+        #print(game.RLreward)
         #print(game.maze_map)
