@@ -122,13 +122,15 @@ class PacmanEnv(gym.Env):
         if self.window is not None:
             pygame.event.post(pygame.event.Event(QUIT))
 
+def constant_lr(_):
+    return 1e-3  # Fixed learning rate of 0.001
 
 
 if __name__ == "__main__":
     env_not_render = gym.make("pacman-v0", max_episode_steps = 500)
     env_render = gym.make("pacman-v0", max_episode_steps = 500 , render_mode = "human")
     
-    model_path = "./models/DQN_model_obs_10_2"
+    model_path = "./models/simple_DQN_baseline_model_40,000,000_steps"
     log_path = "./logs/fit"
 
     
@@ -146,7 +148,7 @@ if __name__ == "__main__":
 
         time_steps = 4000_000
         for i in range (10):
-            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "simple_DQN_model_40,000,000_steps")
+            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "simple_DQN_baseline_model_40,000,000_steps_2")
             model.save(f"{model_path}/{(i+1)*time_steps}")
 
 
@@ -154,7 +156,7 @@ if __name__ == "__main__":
     elif os.path.exists(model_path):
         env = env_render
         obs , _ = env.reset()
-        model_final_path = f"{model_path}/4400000.zip"
+        model_final_path = f"{model_path}/800000.zip"
         model = DQN.load(model_final_path , env = env)
 
         episodes = 10
@@ -165,15 +167,3 @@ if __name__ == "__main__":
                 obs, reward, terminated, truncated, info = env.step(int(action))
                 done = terminated
         env.close()
-
-
-
-
-   
-
-
-
-
-
-
-

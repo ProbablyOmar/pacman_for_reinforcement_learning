@@ -122,11 +122,13 @@ class PacmanEnv(gym.Env):
         if self.window is not None:
             pygame.event.post(pygame.event.Event(QUIT))
 
+def constant_lr(_):
+    return 1e-3  # Fixed learning rate of 0.001
 
 
 if __name__ == "__main__":
-    env_not_render = gym.make("pacman-v0", max_episode_steps = 500)
-    env_render = gym.make("pacman-v0", max_episode_steps = 500 , render_mode = "human")
+    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000)
+    env_render = gym.make("pacman-v0", max_episode_steps = 10_000  , render_mode = "human")
     
     model_path = "./models/DQN_model_obs_10_2"
     log_path = "./logs/fit"
@@ -142,19 +144,37 @@ if __name__ == "__main__":
         obs , _ = env.reset()
         
         ##policy netwok for the model [64,64,32]
-        model = DQN("MultiInputPolicy" , env ,  verbose = 1 , tensorboard_log = log_path)
+        policy_kwargs = dict(net_arch = [64,64,32])
+        model = DQN(
+            "MultiInputPolicy" , 
+            env , 
+            learning_rate  = 0.01 , 
+            learning_starts  = 2000,
+            batch_size=32,
+            gamma = 0.97,
+            #train_freq = (1, "episode"),
+            gradient_steps = 4,
+            target_update_interval=100,
+            exploration_fraction=1,
+            exploration_initial_eps=1,
+            exploration_final_eps=0.05,
 
-        time_steps = 4000_000
-        for i in range (10):
-            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "simple_DQN_model_40,000,000_steps")
+            policy_kwargs = policy_kwargs , 
+            verbose = 1 , 
+            tensorboard_log = log_path
+        )
+
+        time_steps = 400_000
+        for i in range (100):
+            model.learn(total_timesteps = time_steps , progress_bar=False , reset_num_timesteps = False , tb_log_name = "DQN_model_obs_10_2")
             model.save(f"{model_path}/{(i+1)*time_steps}")
 
-
+    
 
     elif os.path.exists(model_path):
         env = env_render
         obs , _ = env.reset()
-        model_final_path = f"{model_path}/4400000.zip"
+        model_final_path = f"{model_path}/800000.zip"
         model = DQN.load(model_final_path , env = env)
 
         episodes = 10
@@ -165,15 +185,3 @@ if __name__ == "__main__":
                 obs, reward, terminated, truncated, info = env.step(int(action))
                 done = terminated
         env.close()
-
-
-
-
-   
-
-
-
-
-
-
-
