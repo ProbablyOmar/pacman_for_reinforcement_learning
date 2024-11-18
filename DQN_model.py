@@ -7,7 +7,6 @@ import time
 from modified_tensor_board import ModifiedTensorBoard
 from keras.callbacks import TensorBoard
 from constants import *
-from enviromentConstants import *
 import random
 
 

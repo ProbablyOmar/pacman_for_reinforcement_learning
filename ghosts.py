@@ -11,13 +11,15 @@ class Ghost(Entity):
     def __init__(self, node, pacman=None, blinky=None):
         Entity.__init__(self, node)
         self.name = GHOST
-        self.points = 200
+        self.points = GHOST_REWARD
+        self.ghost_penality = GHOST_PENALITY
         self.goal = Vector2()
         self.directionMethod = self.goalDirection
         self.pacman = pacman
         self.mode = ModeController(self)
         self.blinky = blinky
         self.homeNode = node
+        
 
     def update(self, dt):
         self.sprites.update(dt)
@@ -126,7 +128,7 @@ class Clyde(Ghost):
 
     def reset(self):
         Entity.reset(self)
-        self.points = 200
+        self.points = GHOST_REWARD
         self.directionMethod = self.goalDirection
 
 
@@ -159,11 +161,18 @@ class GhostGroup(object):
 
     def updatePoints(self):
         for ghost in self:
-            ghost.points *= 2
+            ghost.points += GHOST_UPDATE_REWARD
+
+    def update_penality_points(self):
+        for ghost in self:
+            ghost.ghost_penality -= GHOST_UPDATE_PENALITY
+    # def updatePoints(self):
+    #     for ghost in self:
+    #         ghost.points *= 2
 
     def resetPoints(self):
         for ghost in self:
-            ghost.points = 200
+            ghost.points = GHOST_REWARD
 
     def reset(self):
         for ghost in self:

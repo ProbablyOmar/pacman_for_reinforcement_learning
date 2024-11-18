@@ -15,9 +15,11 @@ class Pacman(Entity):
         self.setBetweenNodes(LEFT)
         self.alive = True
         self.sprites = PacmanSprites(self)
+        self.can_eat = True
 
     def reset(self):
         Entity.reset(self)
+        self.can_eat = True
         self.direction = LEFT
         self.setBetweenNodes(LEFT)
         self.alive = True
@@ -29,9 +31,10 @@ class Pacman(Entity):
         self.direction = STOP
 
     def eatPellets(self, pelletList):
-        for pellet in pelletList:
-            if self.collideCheck(pellet):
-                return pellet
+        if self.can_eat:
+            for pellet in pelletList:
+                if self.tile_collideCheck(pellet):
+                    return pellet
         return None
 
     def collideCheck(self, other):
@@ -42,8 +45,13 @@ class Pacman(Entity):
             return True
         return False
 
+    def tile_collideCheck(self, other):
+        if self.tile == other.tile:
+            return True
+        return False
+
     def collideGhost(self, ghost):
-        return self.collideCheck(ghost)
+        return self.tile_collideCheck(ghost)
 
     def update(self, dt, agent_direction=None):
         self.sprites.update(dt)

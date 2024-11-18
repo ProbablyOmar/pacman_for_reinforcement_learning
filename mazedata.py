@@ -34,9 +34,9 @@ class Maze1(MazeBase):
         self.name = "maze1"
         self.portalPairs = {0: ((0, 17), (27, 17))}
         self.homeoffset = (11.5, 14)
-        self.homenodeconnectLeft = (12, 14)
-        self.homenodeconnectRight = (15, 14)
-        self.pacmanStart = (15, 26)
+        self.homenodeconnectLeft = (12, 14)     #(12, 14)
+        self.homenodeconnectRight = (14, 14)
+        self.pacmanStart = (14, 26)    #(14, 26)
         self.fruitStart = (9, 20)
         self.ghostNodeDeny = {
             UP: ((12, 14), (15, 14), (12, 26), (15, 26)),

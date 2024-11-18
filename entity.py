@@ -29,7 +29,7 @@ class Entity(object):
 
     def setPosition(self):
         self.position = self.node.position.copy()
-        self.tile = (int((self.position.x // TILEWIDTH) - 1), int((self.position.y // TILEHEIGHT) - 4))
+        self.tile = (int((self.position.x // TILEWIDTH)), int((self.position.y // TILEHEIGHT) - 3))
 
     def setStartNode(self, node):
         self.node = node
@@ -124,10 +124,11 @@ class Entity(object):
                 return True
         return False
 
-    def setBetweenNodes(self, direction):
+    def setBetweenNodes(self, direction): 
         if self.node.neighbors[direction] is not None:
             self.target = self.node.neighbors[direction]
             self.position = (self.node.position + self.target.position) / 2.0
+            self.tile = (int((self.position.x // TILEWIDTH)), int((self.position.y // TILEHEIGHT) - 3)) 
 
     def setSpeed(self, speed):
         self.speed = speed * TILEWIDTH / 16
@@ -141,3 +142,19 @@ class Entity(object):
             else:
                 p = self.position.asInt()
                 pygame.draw.circle(screen, self.color, p, self.radius)
+
+    def hit_wall (self , maze_map , direction):
+        entity_x_tile , entity_y_tile = self.tile
+        if direction == RIGHT and entity_x_tile < GAME_COLS - 1 and maze_map[entity_y_tile][entity_x_tile+1] == WALL_MAZE:
+            return True
+        elif direction == LEFT and entity_x_tile > 0 and maze_map[entity_y_tile][entity_x_tile-1] == WALL_MAZE:
+            return True
+        elif direction == UP and entity_y_tile > 0 and maze_map[entity_y_tile - 1][entity_x_tile] == WALL_MAZE:
+            return True
+        elif direction == DOWN and entity_y_tile < GAME_ROWS -1 and maze_map[entity_y_tile + 1][entity_x_tile] == WALL_MAZE:
+            return True
+        else:
+            #print(direction)
+            return False
+        
+

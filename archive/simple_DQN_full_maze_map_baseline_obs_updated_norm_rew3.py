@@ -48,9 +48,6 @@ class PacmanEnv(gym.Env):
                 "pacman_position": spaces.Box(
                     low = np.array([0,0]), high = np.array([GAME_ROWS , GAME_COLS]) , dtype=np.int_
                 ),
-                "pacman_lives" : spaces.Box(
-                    low = np.array([0]), high = np.array([5]) , dtype=np.int_
-                ),
             }
         )
         self.action_space = spaces.Discrete(5, start=0)
@@ -58,7 +55,6 @@ class PacmanEnv(gym.Env):
         self._maze_map = np.zeros(shape=(GAME_ROWS , GAME_COLS), dtype=np.int_)
         self._ghosts_position = np.zeros(shape = (4,4) , dtype=np.int_)
         self._pacman_position = np.array([0, 0], dtype=np.int_)
-        self._pacman_lives = np.array([1], dtype=np.int_)
         self._last_obs = None
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -76,7 +72,6 @@ class PacmanEnv(gym.Env):
             direction = ghost.direction
             reward = GHOST_REWARDS[ghost.points]
             self._ghosts_position[num] = np.array([x , y , direction , reward])
-            self._pacman_lives = np.array([self.game.lives])
 
 
         # print( {
@@ -88,8 +83,7 @@ class PacmanEnv(gym.Env):
         return {
             "maze_map": self._maze_map,
             "ghosts_position": self._ghosts_position,
-            "pacman_position" :  self._pacman_position,
-            "pacman_lives" : self._pacman_lives
+            "pacman_position" :  self._pacman_position
         }
 
     def reset(self, seed=None, options=None):
@@ -102,7 +96,7 @@ class PacmanEnv(gym.Env):
 
     def step(self, action):
         action -= 2
-        step_reward = TIME_PENALITY
+        step_reward = -1
         while True:
             if self.render_mode == "human":
                 self.game.update(
@@ -123,7 +117,7 @@ class PacmanEnv(gym.Env):
             observation = self._getobs()
             info = {}
 
-            if reward != TIME_PENALITY:
+            if reward != -1:
                 step_reward = reward
             if self._last_obs is None or not all(np.array_equal(observation[key], self._last_obs[key]) for key in observation): 
                 self._last_obs = copy.deepcopy(observation)
@@ -143,7 +137,7 @@ if __name__ == "__main__":
     env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000)
     env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human")
     
-    model_path = "./models/DQN_full_maze_map_baseline_obs_updated_norm_work_station1"
+    model_path = "./models/simple_DQN_full_maze_map_baseline_obs_updated_norm_rew3"
     log_path = "./logs/fit"
    
     if not os.path.exists(log_path):
@@ -154,29 +148,11 @@ if __name__ == "__main__":
         env = env_not_render
         obs , _ = env.reset()
         
-        policy_kwargs = dict(net_arch = [256 ,128 , 64 ,64 ,32 , 32 , 8])
-        model = DQN(
-            "MultiInputPolicy" , 
-            env , 
-            learning_rate  = 0.0001 , 
-            learning_starts  = 2000,
-            batch_size=32,
-            gamma = 0.97,
-            #train_freq = (1, "episode"),
-            gradient_steps = 4,
-            target_update_interval=100,
-            exploration_fraction=0.99,
-            exploration_initial_eps=1,
-            exploration_final_eps=0.1,
-
-            policy_kwargs = policy_kwargs , 
-            verbose = 1 , 
-            tensorboard_log = log_path
-        )
+        model = DQN("MultiInputPolicy" , env ,  verbose = 1 , tensorboard_log = log_path)
 
         time_steps = 400_000
         for i in range (100):
-            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "DQN_full_maze_map_baseline_obs_updated_norm_work_station1")
+            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "simple_DQN_full_maze_map_baseline_obs_updated_norm_rew3")
             model.save(f"{model_path}/{(i+1)*time_steps}")
 
     elif os.path.exists(model_path):
@@ -191,13 +167,12 @@ if __name__ == "__main__":
             while not done:
                 action , next_state = model.predict(obs)
                 obs, reward, terminated, truncated, info = env.step(int(action))
-                #print(reward)
+                print(reward)
                 done = terminated
         env.close()
 
 
 # if __name__ == "__main__":
-#     os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 #     env = gym.make("pacman-v0", render_mode="human")
 #     # print("Checking Environment")
 #     # check_env(env.unwrapped)
@@ -205,30 +180,9 @@ if __name__ == "__main__":
 
 #     obs = env.reset()[0]
 
-#     action = 4
 #     while True:
 #         randaction = env.action_space.sample()
 #         env.render()
-#         obs, reward, terminated, _, _ = env.step(action)
-#         print(obs)
-#         print(reward)
-
-#         if reward == -3.5:
-#             action = 1
-
-
-
-
-
-
-
-
-
-   
-
-
-
-
-
-
-
+#         obs, reward, terminated, _, _ = env.step(4)
+#         # print(obs)
+#         # print("***************" , reward)
