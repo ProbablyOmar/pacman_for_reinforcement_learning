@@ -87,10 +87,16 @@ class Entity(object):
 
     def validDirection(self, direction):
         if direction is not STOP:
-            if self.name in self.node.access[direction]:
-                if self.node.neighbors[direction] is not None:
-                    return True
+            # Debugging: Check if direction is in node.access
+            # print(f"Checking valid direction: {direction}")
+            # print(f"Node access: {self.node.access}")
+            
+            if direction in self.node.access:  # Ensure direction is a valid key
+                if self.name in self.node.access[direction]:
+                    if self.node.neighbors[direction] is not None:
+                        return True
         return False
+
 
     def getNewTarget(self, direction):
         if self.validDirection(direction):
