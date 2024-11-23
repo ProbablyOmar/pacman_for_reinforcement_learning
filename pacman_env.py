@@ -24,7 +24,9 @@ class PacmanEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
 
     def __init__(self, render_mode=None):
-        self.game = GameController(rlTraining=True)
+        self.game = GameController(rlTraining=True , mode = SAFE_MODE)
+        self.game_score = 0
+        self.useless_steps = 0
 
         self.observation_space = spaces.Dict(
             {
@@ -56,7 +58,7 @@ class PacmanEnv(gym.Env):
         self.action_space = spaces.Discrete(5, start=0)
 
         self._maze_map = np.zeros(shape=(GAME_ROWS , GAME_COLS), dtype=np.int_)
-        self._ghosts_position = np.zeros(shape = (4,4) , dtype=np.int_)
+        self._ghosts_position = np.array([[0,0,0,1],[0,0,0,1],[0,0,0,1],[0,0,0,1]] , dtype=np.int_)
         self._pacman_position = np.array([0, 0], dtype=np.int_)
         self._pacman_lives = np.array([1], dtype=np.int_)
         self._last_obs = None
@@ -70,15 +72,16 @@ class PacmanEnv(gym.Env):
     def _getobs(self):
         self._pacman_position = np.array(self.game.pacman.tile)
         self._maze_map = self.game.maze_map
+        self._pacman_lives = np.array([self.game.lives])
 
+        ### enable this when enabling the ghosts
         for num ,  ghost in enumerate(self.game.ghosts.ghosts):
             x , y = ghost.tile
             direction = ghost.direction
             reward = GHOST_REWARDS[ghost.points]
             self._ghosts_position[num] = np.array([x , y , direction , reward])
-            self._pacman_lives = np.array([self.game.lives])
-
-
+        #########################################################################**********************
+        
         # print( {
         #     "maze_map": self._maze_map,
         #     "ghosts_position": self._ghosts_position,
@@ -127,6 +130,17 @@ class PacmanEnv(gym.Env):
                 step_reward = reward
             if self._last_obs is None or not all(np.array_equal(observation[key], self._last_obs[key]) for key in observation): 
                 self._last_obs = copy.deepcopy(observation)
+                self.game_score += step_reward
+
+                if self.game.mode == SAFE_MODE:
+                    if reward == TIME_PENALITY:
+                        self.useless_steps +=1
+                        if self.useless_steps >= MAX_USELESS_STEPS:
+                            self.game.done = True
+                            terminated = self.game.done
+                    else:
+                        self.useless_steps = 0
+                    observation["ghosts_position"] = np.array([[0,0,0,1],[0,0,0,1],[0,0,0,1],[0,0,0,1]] , dtype=np.int_)
                 return observation, step_reward, terminated, truncated, info 
 
     def render(self):
@@ -138,12 +152,12 @@ class PacmanEnv(gym.Env):
             pygame.event.post(pygame.event.Event(QUIT))
 
 
-
 if __name__ == "__main__":
     env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000)
     env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human")
     
-    model_path = "./models/DQN_full_maze_map_baseline_obs_updated_norm_work_station1"
+    model_load_path = "./models/DQN_full_maze_map_baseline_hir_learning"
+    model_path = "./models/DQN_full_maze_map_baseline_hir_learning_1.1.2"
     log_path = "./logs/fit"
    
     if not os.path.exists(log_path):
@@ -153,30 +167,36 @@ if __name__ == "__main__":
         os.makedirs(model_path)
         env = env_not_render
         obs , _ = env.reset()
-        
-        policy_kwargs = dict(net_arch = [256 ,128 , 64 ,64 ,32 , 32 , 8])
-        model = DQN(
-            "MultiInputPolicy" , 
-            env , 
-            learning_rate  = 0.0001 , 
-            learning_starts  = 2000,
-            batch_size=32,
-            gamma = 0.97,
-            #train_freq = (1, "episode"),
-            gradient_steps = 4,
-            target_update_interval=100,
-            exploration_fraction=0.99,
-            exploration_initial_eps=1,
-            exploration_final_eps=0.1,
 
-            policy_kwargs = policy_kwargs , 
-            verbose = 1 , 
-            tensorboard_log = log_path
-        )
+        model_final_path = f"{model_load_path}/1200000"
+        model = DQN.load(model_final_path , env = env)
+        model.learning_rate  = 1e-5
+        model.gamma = 0.99
+        model.exploration_fraction = 1
+        
+        # policy_kwargs = dict(net_arch = [256 ,128 , 64 ,64 ,32 , 32 , 8])
+        # model = DQN(
+        #     "MultiInputPolicy" , 
+        #     env , 
+        #     learning_rate  = 0.0001 , 
+        #     learning_starts  = 2000,
+        #     batch_size=32,
+        #     gamma = 0.97,
+        #     #train_freq = (1, "episode"),
+        #     gradient_steps = 4,
+        #     target_update_interval=100,
+        #     exploration_fraction=0.99,
+        #     exploration_initial_eps=1,
+        #     exploration_final_eps=0.1,
+
+        #     policy_kwargs = policy_kwargs , 
+        #     verbose = 1 , 
+        #     tensorboard_log = log_path
+        # )
 
         time_steps = 400_000
         for i in range (100):
-            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "DQN_full_maze_map_baseline_obs_updated_norm_work_station1")
+            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./models/DQN_full_maze_map_baseline_hir_learning_1.1.2")
             model.save(f"{model_path}/{(i+1)*time_steps}")
 
     elif os.path.exists(model_path):
@@ -191,7 +211,7 @@ if __name__ == "__main__":
             while not done:
                 action , next_state = model.predict(obs)
                 obs, reward, terminated, truncated, info = env.step(int(action))
-                #print(reward)
+                print(env.game_score)
                 done = terminated
         env.close()
 
@@ -204,17 +224,22 @@ if __name__ == "__main__":
 #     # print("done checking environment")
 
 #     obs = env.reset()[0]
-
+#     done = False
 #     action = 4
-#     while True:
+#     while not done:
 #         randaction = env.action_space.sample()
 #         env.render()
 #         obs, reward, terminated, _, _ = env.step(action)
-#         print(obs)
+#         done = terminated 
+#         #print(obs)
 #         print(reward)
-
-#         if reward == -3.5:
+#         if action == 1 and reward == HIT_WALL_PENALITY:
+#             action = 2
+#         elif reward == HIT_WALL_PENALITY:
 #             action = 1
+
+
+
 
 
 

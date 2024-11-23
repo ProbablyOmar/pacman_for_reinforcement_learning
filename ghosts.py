@@ -19,6 +19,8 @@ class Ghost(Entity):
         self.mode = ModeController(self)
         self.blinky = blinky
         self.homeNode = node
+        self.can_eat = True
+        self.can_be_eaten = True
         
 
     def update(self, dt):

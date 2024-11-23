@@ -17,7 +17,7 @@ import time
 from copy import deepcopy
 
 class GameController(object):
-    def __init__(self, rlTraining=False):
+    def __init__(self, rlTraining=False , mode = NORMAL_MODE):
         pygame.init()
         self.rlTraining = rlTraining
         self.screen = pygame.display.set_mode(SCREENSIZE, 0, 32)
@@ -32,7 +32,11 @@ class GameController(object):
         self.fruit = None
         self.pause = Pauser(not self.rlTraining)
         self.level = 0
-        self.lives = 5
+        self.mode = mode
+        if self.mode == NORMAL_MODE:
+            self.lives = 5
+        elif self.mode == SAFE_MODE:
+            self.lives = 1
         self.score = 0
         self.RLreward = 0
         self.textgroup = TextGroup(rlTraining=self.rlTraining)
@@ -46,16 +50,20 @@ class GameController(object):
         self.win = False
         self.done = False
         self.startGame()
-        
 
 
     def restartGame(self):
         self.pacman.can_eat = True
-        self.gameOver = False
-        self.win = False
-        self.lives = 5
+        #self.gameOver = False
+        self.textgroup.hideText()
+        #self.win = False
+        # self.lives = 5
+        if self.mode == NORMAL_MODE:
+            self.lives = 5
+        elif self.mode == SAFE_MODE:
+            self.lives = 1
         self.level = 0
-        self.pause.paused = not self.rlTraining
+        self.pause.paused = False
         self.fruit = None
         self.startGame()
         self.score = 0
@@ -67,9 +75,7 @@ class GameController(object):
         self.fruitcaptured = []
 
     def resetLevel(self):
-        self.gameOver = False
-        self.win = False
-        self.pause.paused = not self.rlTraining
+        self.pause.paused = False
         self.pacman.reset()
         self.ghosts.reset()
         self.fruit = None
@@ -78,11 +84,11 @@ class GameController(object):
 
     def nextLevel(self):
         self.showEntities()
-        self.level += 1
-        if self.level > NUMBEROFLEVELS:
-            self.gameOver = True
-        self.pause.pasued = True
-        self.startGame()
+        self.level += 1   ##change this if you ant to update the leve not to play the same level again
+        if self.level >= NUMBEROFLEVELS:
+            self.win = True
+        self.pause.pasued = False
+        self.restartGame()
         self.textgroup.updateLevel(self.level)
 
     def setBackground(self):
@@ -100,6 +106,7 @@ class GameController(object):
         self.background = self.background_norm
 
     def startGame(self):
+        self.pause.paused = False
         self.mazedata.loadMaze(self.level)
         mazeFolderPath = Path("./mazes") / (self.mazedata.obj.name)
         mazeFilePath = mazeFolderPath / (self.mazedata.obj.name + ".txt")
@@ -131,6 +138,12 @@ class GameController(object):
         self.ghosts.blinky.setStartNode(
             self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 0))
         )
+
+        if self.mode == SAFE_MODE:
+            for ghost in self.ghosts:
+                ghost.can_be_eaten = False
+                ghost.can_eat = False
+
         self.nodes.denyHomeAccess(self.pacman)
         self.nodes.denyHomeAccessList(self.ghosts)
         self.ghosts.inky.startNode.denyAccess(RIGHT, self.ghosts.inky)
@@ -138,13 +151,13 @@ class GameController(object):
         self.mazedata.obj.denyGhostsAccess(self.ghosts, self.nodes)
 
         self.maze_map = self.pellets.map_init_pell_rewards
+        
 
     # def update_rate (self , update_clock):
     #     self.update_clock.tick(update_clock) / 1000.0
     #     self.take_step = True
 
     def update(self, agent_direction=None, render=True, clocktick=60):
-        self.done = self.gameOver or self.win
         self.RLreward = 0
 
         ### check if the pacman hits a wall
@@ -170,6 +183,7 @@ class GameController(object):
             self.checkGhostEvents()
             self.checkFruitEvents()
 
+        self.done = self.gameOver or self.win
         if self.RLreward == 0:
             self.updateScore(TIME_PENALITY)
 
@@ -214,37 +228,39 @@ class GameController(object):
         for ghost in self.ghosts:
             if self.pacman.collideGhost(ghost):
                 if ghost.mode.current is FREIGHT:
-                    self.pacman.visible = False
-                    ghost.visible = False
-                    self.updateScore(ghost.points)
-                    self.textgroup.addText(
-                        str(ghost.points),
-                        WHITE,
-                        ghost.position.x,
-                        ghost.position.y,
-                        8,
-                        time=1,
-                    )
-                    self.ghosts.updatePoints()
-                    self.pause.setPause(pauseTime=1, func=self.showEntities)
-                    ghost.startSpawn()
-                    self.nodes.allowHomeAccess(ghost)
+                    if ghost.can_be_eaten:
+                        self.pacman.visible = False
+                        ghost.visible = False
+                        self.updateScore(ghost.points)
+                        self.textgroup.addText(
+                            str(ghost.points),
+                            WHITE,
+                            ghost.position.x,
+                            ghost.position.y,
+                            8,
+                            time=1,
+                        )
+                        self.ghosts.updatePoints()
+                        self.pause.setPause(pauseTime=1, func=self.showEntities)
+                        ghost.startSpawn()
+                        self.nodes.allowHomeAccess(ghost)
                 elif ghost.mode.current is not SPAWN:
-                    if self.pacman.alive:
-                        self.pacman.can_eat = False
-                        self.lives -= 1
-                        self.updateScore(ghost.ghost_penality)
-                        ## increase the ghost penality each time you lose a life 
-                        self.ghosts.update_penality_points()
-                        self.lifesprites.removeImage()
-                        self.pacman.die()
-                        self.ghosts.hide()
-                        if self.lives <= 0:
-                            self.textgroup.showText(GAMEOVERTXT)
-                            self.gameOver = True
-                            self.pause.setPause(pauseTime=3, func=self.restartGame)
-                        else:
-                            self.pause.setPause(pauseTime=3, func=self.resetLevel)
+                    if ghost.can_eat:
+                        if self.pacman.alive:
+                            self.pacman.can_eat = False
+                            self.lives -= 1
+                            self.updateScore(ghost.ghost_penality)
+                            ## increase the ghost penality each time you lose a life 
+                            self.ghosts.update_penality_points()
+                            self.lifesprites.removeImage()
+                            self.pacman.die()
+                            self.ghosts.hide()
+                            if self.lives <= 0:
+                                self.textgroup.showText(GAMEOVERTXT)
+                                self.gameOver = True
+                                self.restartGame()
+                            else:
+                                self.resetLevel()
 
     def showEntities(self):
         self.pacman.visible = True
@@ -278,10 +294,10 @@ class GameController(object):
 
         if self.pellets.isEmpty():
             self.updateScore(FINISH_LEVEL_REWARD)
-            self.win = True
-            self.flashBG = True
+            #self.win = True
+            self.flashBG = False
             self.hideEntities()
-            self.pause.setPause(pauseTime=3, func=self.restartGame)   ##self.pause.setPause(pauseTime=3, func=self.nextLevel)
+            self.nextLevel()  ##self.pause.setPause(pauseTime=3, func=self.nextLevel)
 
     def checkFruitEvents(self):
         if self.pellets.numEaten == 50 or self.pellets.numEaten == 140:
@@ -339,12 +355,21 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True)
-    while True:
+    game = GameController(rlTraining=True , mode = SAFE_MODE)
+    done = False
+    while not done:
         game.update(render=True)
+        done = game.done
+        # print ("done: " , game.done)
+        # print("gameover: " , game.gameOver)
+        # print("win: " , game.win)
+        #print(game.score)
         #print(game.RLreward)
         # print(game.pacman.tile)
         # print(game.maze_map)
         # print("*************************************" , game.RLreward)
         # print("*************************************" , game.pacman.tile)
+    # print ("done: " , game.done)
+    # print("gameover: " , game.gameOver)
+    # print("win: " , game.win)
 
