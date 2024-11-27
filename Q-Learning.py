@@ -11,19 +11,19 @@ env_render = gym.make("pacman-v0", render_mode="human")
 env_no_render = gym.make("pacman-v0", render_mode=None)
     
     
-LEARNING_RATE = 0.1
-DISCOUNT = 0.95
-EPISODES = 25000
+LEARNING_RATE = 0.01
+DISCOUNT = 0.97
+EPISODES = 30000
 
-epsilon = 0.5
+epsilon = 0.7
 
 START_EPSILON_DECAYING = 1
 END_EPSILON_DECAYING = EPISODES // 2
  
-epsilon_decay_value = epsilon/(END_EPSILON_DECAYING - START_EPSILON_DECAYING) #decay value
+epsilon_decay_value = epsilon/(END_EPSILON_DECAYING - START_EPSILON_DECAYING) 
 
 SHOW_EVERY = 5000
-SAVE_EVERY = 5
+SAVE_EVERY = 200
 
 #discretization parameters 
 
