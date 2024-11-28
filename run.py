@@ -14,7 +14,7 @@ from sprites import MazeSprites
 from mazedata import MazeData
 import numpy as np
 import time
-from copy import deepcopy
+import copy
 
 class GameController(object):
     def __init__(self, rlTraining=False , mode = NORMAL_MODE):
@@ -49,6 +49,7 @@ class GameController(object):
         self.gameOver = False
         self.win = False
         self.done = False
+        self.observation = None
         self.startGame()
 
 
@@ -150,7 +151,9 @@ class GameController(object):
         self.ghosts.clyde.startNode.denyAccess(LEFT, self.ghosts.clyde)
         self.mazedata.obj.denyGhostsAccess(self.ghosts, self.nodes)
 
-        self.maze_map = self.pellets.map_init_pell_rewards
+        self.set_maze_map = self.pellets.map_init_pell_rewards
+        self.maze_map = copy.deepcopy(self.set_maze_map)
+        self.observation = self.maze_map
         
 
     # def update_rate (self , update_clock):
@@ -159,9 +162,9 @@ class GameController(object):
 
     def update(self, agent_direction=None, render=True, clocktick=60):
         self.RLreward = 0
-
+        
         ### check if the pacman hits a wall
-        pac_hit_wall = self.pacman.hit_wall(self.maze_map , agent_direction)
+        pac_hit_wall = self.pacman.hit_wall(self.set_maze_map , agent_direction)
         if pac_hit_wall:
             self.updateScore(HIT_WALL_PENALITY)
         ################################################
@@ -180,9 +183,18 @@ class GameController(object):
             if self.fruit is not None:
                 self.fruit.update(dt)
             self.checkPelletEvents()
-            self.checkGhostEvents()
             self.checkFruitEvents()
+            ##update the maze_map with the new pellete and fruit positions
+            self.maze_map = copy.deepcopy(self.set_maze_map)
 
+            self.maze_map[self.pacman.tile[1]][self.pacman.tile[0]] = PACMAN_MAZE
+            self.checkGhostEvents()
+
+            ##now self.maze_map is ready
+            self.observation = self.maze_map
+            del self.maze_map
+
+        
         self.done = self.gameOver or self.win
         if self.RLreward == 0:
             self.updateScore(TIME_PENALITY)
@@ -226,6 +238,26 @@ class GameController(object):
 
     def checkGhostEvents(self):
         for ghost in self.ghosts:
+            if ghost.mode.current is CHASE or ghost.mode.current is SCATTER:
+                if ghost.direction == RIGHT:
+                    self.maze_map[ghost.tile[1]][ghost.tile[0]] = GCR_MAZE
+                if ghost.direction == LEFT:
+                    self.maze_map[ghost.tile[1]][ghost.tile[0]] = GCL_MAZE
+                if ghost.direction == UP:
+                    self.maze_map[ghost.tile[1]][ghost.tile[0]] = GCU_MAZE
+                if ghost.direction == DOWN:
+                    self.maze_map[ghost.tile[1]][ghost.tile[0]] = GCD_MAZE
+
+            elif ghost.mode.current is FREIGHT:
+                if ghost.direction == RIGHT:
+                    self.maze_map[ghost.tile[1]][ghost.tile[0]] = GSR_MAZE
+                if ghost.direction == LEFT:
+                    self.maze_map[ghost.tile[1]][ghost.tile[0]] = GSL_MAZE
+                if ghost.direction == UP:
+                    self.maze_map[ghost.tile[1]][ghost.tile[0]] = GSU_MAZE
+                if ghost.direction == DOWN:
+                    self.maze_map[ghost.tile[1]][ghost.tile[0]] = GSD_MAZE
+
             if self.pacman.collideGhost(ghost):
                 if ghost.mode.current is FREIGHT:
                     if ghost.can_be_eaten:
@@ -277,9 +309,9 @@ class GameController(object):
             #print(f"Pellet Eaten at: {pellet.tile}, Reward: {pellet.points}")
             ###update the pellet when eaten and delete the pellet rewards from it 
             if pellet.name == PELLET:
-                self.maze_map[pellet.tile[1]][pellet.tile[0]] -= PELLET_MAZE
+                self.set_maze_map[pellet.tile[1]][pellet.tile[0]] -= PELLET_MAZE
             elif pellet.name == POWERPELLET:
-                self.maze_map[pellet.tile[1]][pellet.tile[0]] -= PP_MAZE
+                self.set_maze_map[pellet.tile[1]][pellet.tile[0]] -= PP_MAZE
             ###
 
             self.pellets.numEaten += 1
@@ -304,16 +336,16 @@ class GameController(object):
             if self.fruit is None:
                 self.fruit = Fruit(self.nodes.getNodeFromTiles(13, 20), self.level)
                 #### update the maze map with the fruit reward 
-                self.maze_map[self.fruit.tile[1]][self.fruit.tile[0]] = FRUIT_MAZE
+                self.set_maze_map[self.fruit.tile[1]][self.fruit.tile[0]] = FRUIT_MAZE
                 ###
 
         if self.fruit is not None:
             #### update the maze map with the fruit reward 
-            self.maze_map[self.fruit.tile[1]][self.fruit.tile[0]] = FRUIT_MAZE
+            self.set_maze_map[self.fruit.tile[1]][self.fruit.tile[0]] = FRUIT_MAZE
             ###
             
             if self.pacman.collideCheck(self.fruit):
-                self.maze_map[self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
+                self.set_maze_map[self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
                 self.updateScore(self.fruit.points)
                 self.textgroup.addText(
                     str(self.fruit.points),
@@ -332,7 +364,7 @@ class GameController(object):
                     self.fruitcaptured.append(self.fruit.image)
                 self.fruit = None
             elif self.fruit.destroy:
-                self.maze_map[self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
+                self.set_maze_map[self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
                 self.fruit = None
 
     def render(self):
@@ -359,6 +391,7 @@ if __name__ == "__main__":
     done = False
     while not done:
         game.update(render=True)
+        #print(game.observation)
         done = game.done
         # print ("done: " , game.done)
         # print("gameover: " , game.gameOver)

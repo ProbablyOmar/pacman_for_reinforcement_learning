@@ -75,7 +75,7 @@ class PelletGroup(object):
                     ###
 
                 ## if its a wall in the maze
-                elif (data[row][col] in ["X"] or (data[row][col]).isdigit())  and row >= 3 and row <= 33:
+                elif (data[row][col] in ["X" , "="] or (data[row][col]).isdigit())  and row >= 3 and row <= 33:
                     self.map_init_pell_rewards[row-3][col] = WALL_MAZE
 
     def readPelletfile(self, pelletfile):
