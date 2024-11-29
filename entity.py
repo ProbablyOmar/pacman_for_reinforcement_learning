@@ -6,7 +6,7 @@ from random import randint
 
 
 class Entity(object):
-    def __init__(self, node):
+    def __init__(self, node , move_mode = DISCRETE_STEPS_MODE):
         self.name = None
         self.directions = {
             UP: Vector2(0, -1),
@@ -26,6 +26,7 @@ class Entity(object):
         self.directionMethod = self.randomDirection
         self.setStartNode(node)
         self.image = None
+        self.move_mode = move_mode
 
     def setPosition(self):
         self.position = self.node.position.copy()
@@ -38,9 +39,28 @@ class Entity(object):
         self.setPosition()
 
     def update(self, dt):
-        self.position += self.directions[self.direction] * self.speed * dt
+        if self.move_mode == CONT_STEPS_MODE:
+            self.position += self.directions[self.direction] * self.speed * dt
 
-        if self.overshotTarget():
+            if self.overshotTarget():
+                self.node = self.target
+                directions = self.validDirections()
+                direction = self.directionMethod(directions)
+                if not self.disablePortal:
+                    if self.node.neighbors[PORTAL] is not None:
+                        self.node = self.node.neighbors[PORTAL]
+                self.target = self.getNewTarget(direction)
+                if self.target is not self.node:
+                    self.direction = direction
+                else:
+                    self.target = self.getNewTarget(self.direction)
+                    self.direction = STOP
+                self.setPosition()
+
+        elif self.move_mode == DISCRETE_STEPS_MODE:
+            #self.position += self.directions[self.direction] * self.speed * dt
+
+            #if self.overshotTarget():
             self.node = self.target
             directions = self.validDirections()
             direction = self.directionMethod(directions)
@@ -52,6 +72,7 @@ class Entity(object):
                 self.direction = direction
             else:
                 self.target = self.getNewTarget(self.direction)
+                self.direction = STOP
             self.setPosition()
 
     def goalDirection(self, directions):

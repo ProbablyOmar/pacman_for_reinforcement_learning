@@ -135,18 +135,24 @@ class Clyde(Ghost):
 
 
 class GhostGroup(object):
-    def __init__(self, node, pacman):
+    def __init__(self, node, pacman , move_mode = DISCRETE_STEPS_MODE):
         self.blinky = Blinky(node, pacman)
         self.pinky = Pinky(node, pacman)
         self.inky = Inky(node, pacman, self.blinky)
         self.clyde = Clyde(node, pacman)
         self.ghosts = [self.blinky, self.pinky, self.inky, self.clyde]
+        self.move_mode = move_mode
+        self.set_move_mode()
 
     def __iter__(self):
         return iter(self.ghosts)
 
     def __getitem__(self, index):
         return self.ghosts[index]
+
+    def set_move_mode(self):
+        for ghost in self.ghosts:
+            ghost.move_mode = self.move_mode
 
     def update(self, dt):
         for ghost in self:
