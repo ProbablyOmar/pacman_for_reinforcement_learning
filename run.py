@@ -37,6 +37,8 @@ class GameController(object):
 
         self.mode = mode
         self.lives = pacman_lives
+        self.pacman_original_lives = pacman_lives
+
         self.score = 0
         self.RLreward = 0
         self.textgroup = TextGroup(rlTraining=self.rlTraining)
@@ -59,10 +61,7 @@ class GameController(object):
         self.textgroup.hideText()
         #self.win = False
         # self.lives = 5
-        if self.mode == NORMAL_MODE:
-            self.lives = 5
-        elif self.mode == SAFE_MODE:
-            self.lives = 1
+        self.lives = self.pacman_original_lives
         self.level = 0
         self.pause.paused = False
         self.fruit = None
@@ -143,7 +142,7 @@ class GameController(object):
 
         if self.mode == SAFE_MODE:
             for ghost in self.ghosts:
-                ghost.visible = False
+                #ghost.visible = False
                 ghost.can_be_eaten = False
                 ghost.can_eat = False
 
@@ -176,6 +175,13 @@ class GameController(object):
 
     def update(self, agent_direction=None, render=True):
         self.RLreward = 0
+        #print ("order direction: " , agent_direction , " pacman direction: " , self.pacman.direction)
+        ### check if the pacman is changing directions with no فايدة
+        if self.rlTraining ==True and self.mode == SAFE_MODE:
+            if agent_direction == - self.pacman.direction and agent_direction != STOP:
+                self.updateScore(RAND_PENALITY  )
+        ################################################
+
         
         ### check if the pacman hits a wall
         pac_hit_wall = self.pacman.hit_wall(self.set_maze_map , agent_direction)
@@ -210,6 +216,10 @@ class GameController(object):
 
         
         self.done = self.gameOver or self.win
+        ## penalize the leftover pellets
+        
+        if self.done == True:
+            self.updateScore(PELLET_LOST_PENALITY * len(self.pellets.pelletList))
         if self.RLreward == 0:
             self.updateScore(TIME_PENALITY)
 
@@ -231,7 +241,11 @@ class GameController(object):
 
 
     def updateScore(self, points):
-        self.RLreward = points
+        if self.RLreward == RAND_PENALITY or self.RLreward == PELLET_LOST_PENALITY:
+            self.RLreward += points
+        else:
+            self.RLreward = points
+        self.RLreward = round(self.RLreward , 2)
         self.score += points
         self.textgroup.updateScore(self.score)
 
@@ -272,7 +286,7 @@ class GameController(object):
                 if ghost.direction == DOWN:
                     self.maze_map[ghost.tile[1]][ghost.tile[0]] = GSD_MAZE
 
-        if self.mode == SCARY_1_MODE and ghost.name == BLINKY:
+        elif self.mode == SCARY_1_MODE and ghost.name == BLINKY:
             if ghost.mode.current is CHASE or ghost.mode.current is SCATTER:
                 if ghost.direction == RIGHT:
                     self.maze_map[ghost.tile[1]][ghost.tile[0]] = GCR_MAZE
@@ -376,6 +390,9 @@ class GameController(object):
 
             self.pellets.numEaten += 1
             self.updateScore(pellet.points)
+            ## update pellet points each time you eat a new one
+            self.pellets.updatePoints()
+
             if self.pellets.numEaten == 30:
                 self.ghosts.inky.startNode.allowAccess(RIGHT, self.ghosts.inky)
             if self.pellets.numEaten == 70:
@@ -447,12 +464,26 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=2)
+    game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=2)
     done = False
+    agent_direction=LEFT
+
+    cnt = 0
+
     while not done:
+        cnt+=1
         game.update(render=True)
         #print(game.observation)
         done = game.done
+        #print("direction: ", game.pacman.direction)
+
+        if agent_direction == LEFT:
+            agent_direction = RIGHT
+        elif agent_direction == RIGHT:
+            agent_direction = LEFT
+
+        if cnt == 100:
+            game.gameOver = True
         # print ("done: " , game.done)
         # print("gameover: " , game.gameOver)
         # print("win: " , game.win)
@@ -460,8 +491,8 @@ if __name__ == "__main__":
         #print(game.RLreward)
         # print(game.pacman.tile)
         # print(game.maze_map)
-        # print("*************************************" , game.RLreward)
-        print("*************************************" , game.pacman.tile)
+        #print("*************************************" , game.RLreward)
+        #print("*************************************" , game.pacman.tile)
     # print ("done: " , game.done)
     # print("gameover: " , game.gameOver)
     # print("win: " , game.win)

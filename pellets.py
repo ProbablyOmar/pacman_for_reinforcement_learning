@@ -50,6 +50,9 @@ class PelletGroup(object):
     def set_maze_pellets_map (self):
         self.map_init_pell_rewards = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)
         
+    def updatePoints(self):
+        for pellet in self.pelletList:
+            pellet.points += PELLET_REWARD_UPDATE
 
     def update(self, dt):
         for powerpellet in self.powerpellets:

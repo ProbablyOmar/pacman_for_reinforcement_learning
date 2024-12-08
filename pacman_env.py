@@ -7,8 +7,9 @@ import numpy as np
 from gymnasium import spaces
 from run import GameController
 from constants import *
-from DQN_model import CustomCNN
+from DQN_model import CustomCNN , CustomCNN_eat_pellets2 , CustomCNN_eat_pellets3 , CustomCNN_eat_pellets5 , CustomCNN_eat_pellets_from_beg_2
 from stable_baselines3 import DQN
+from modified_tensorboard import TensorboardCallback
 from stable_baselines3.dqn import MultiInputPolicy
 import os
 import copy
@@ -23,9 +24,10 @@ if "pacman-v0" not in gym.envs.registry:
 class PacmanEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
 
-    def __init__(self, render_mode=None , mode = NORMAL_MODE , move_mode = CONT_STEPS_MODE , clock_tick = 60 , pacman_lives = 5):
+    def __init__(self, render_mode=None , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1):
 
         self.game = GameController(rlTraining = True , mode = mode , move_mode = move_mode , clock_tick = clock_tick , pacman_lives = pacman_lives)
+        self.num_pellets_last = 0
         self.game_score = 0
         self.useless_steps = 0
 
@@ -53,6 +55,7 @@ class PacmanEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.game.restartGame()
+        self.game_score = 0
 
         observation = self._getobs()
         info = {}
@@ -86,6 +89,7 @@ class PacmanEnv(gym.Env):
                     step_reward = reward
 
                 if not np.array_equal(observation , self._last_obs): 
+                    self.num_pellets_last = len(self.game.pellets.pelletList)
                     np.copyto(self._last_obs , observation)
                     self.game_score += step_reward
 
@@ -117,7 +121,7 @@ class PacmanEnv(gym.Env):
                     render=False
                     #clocktick=self.metadata["render_fps"],
                 )
-            
+            self.num_pellets_last = len(self.game.pellets.pelletList)
             terminated = self.game.done
             truncated = False
             reward = self.game.RLreward
@@ -149,90 +153,91 @@ class PacmanEnv(gym.Env):
             pygame.event.post(pygame.event.Event(QUIT))
 
 
-# if __name__ == "__main__":
-#     env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000)
-#     env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human")
-    
-#     model_path = "./models/dqn_baseline_cnn3"   #with max_useless_steps = 1000
-#     log_path = "./logs/fit"
-   
-#     if not os.path.exists(log_path):
-#         os.makedirs(log_path)
-
-#     if not os.path.exists(model_path):  
-#         print("can't find path")
-#         os.makedirs(model_path)
-#         env = env_not_render
-#         obs , _ = env.reset()
-
-#         policy_kwargs = dict(
-#             features_extractor_class=CustomCNN,
-#             features_extractor_kwargs=dict(features_dim=256),
-#         )
-
-#         model = DQN(
-#             "CnnPolicy" , 
-#             env , 
-#             learning_rate  = 0.0001 , 
-#             learning_starts  = 2000,
-#             batch_size= 32,   #32
-#             gamma = 0.97,
-#             #train_freq = (1, "episode"),
-#             gradient_steps = 4,
-#             target_update_interval=100,
-#             exploration_fraction=0.99,
-#             exploration_initial_eps=1,
-#             exploration_final_eps=0.1,
-
-#             policy_kwargs = policy_kwargs , 
-#             verbose = 1 , 
-#             tensorboard_log = log_path
-#         )
-
-#         time_steps = 400_000
-#         for i in range (100):
-#             model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/dqn_baseline_cnn_alex_net")
-#             model.save(f"{model_path}/{(i+1)*time_steps}")
-
-#     elif os.path.exists(model_path):
-#         env = env_render
-#         obs , _ = env.reset()
-#         model_final_path = f"{model_path}/1200000.zip"
-#         model = DQN.load(model_final_path , env = env)
-#         print(model.policy)
-
-#         episodes = 10
-#         for ep in range(episodes):
-#             done = False
-#             while not done:
-#                 action , next_state = model.predict(obs)
-#                 obs, reward, terminated, truncated, info = env.step(int(action))
-#                 print(env.game_score)
-#                 done = terminated
-#         env.close()
-
-
 if __name__ == "__main__":
-    os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-    env = gym.make("pacman-v0", render_mode="human" , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick = 10 , pacman_lives = 1)
-    # print("Checking Environment")
-    # check_env(env.unwrapped)
-    # print("done checking environment")
+    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1)
+    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1)
+    
+    model_load_path = "./models/dqn_baseline_cnn3_eat_pellets_4"   #with max_useless_steps = 1000
+    model_path = "./models/dqn_baseline_cnn3_eat_pellets_from_beg_2"
 
-    obs = env.reset()[0]
-    done = False
-    action = 4
-    while not done:
-        randaction = env.action_space.sample()
-        env.render()
-        obs, reward, terminated, _, _ = env.step(action)
-        done = terminated 
-        print(obs)
-        #print(reward)
-        if action == 1 and reward == HIT_WALL_PENALITY:
-            action = 2
-        elif reward == HIT_WALL_PENALITY:
-            action = 1
+    log_path = "./logs/fit"
+   
+    if not os.path.exists(log_path):
+        os.makedirs(log_path)
+
+    if not os.path.exists(model_path):  
+        os.makedirs(model_path) 
+        env = env_not_render
+        obs , _ = env.reset()
+
+        policy_kwargs = dict(
+            features_extractor_class=CustomCNN_eat_pellets_from_beg_2,
+            features_extractor_kwargs=dict(features_dim=1024),
+        )
+        model = DQN(
+            "CnnPolicy" , 
+            env , 
+            learning_rate  = 0.00005 , 
+            learning_starts  = 2000,
+            batch_size= 32,   #32
+            gamma = 0.97,
+            #train_freq = (1, "episode"),
+            gradient_steps = 4,
+            target_update_interval=150,
+            exploration_fraction=1,
+            exploration_initial_eps=1,
+            exploration_final_eps=0.1,
+
+            policy_kwargs = policy_kwargs , 
+            verbose = 1 , 
+            tensorboard_log = log_path
+        )
+
+        #print("here ***********: " , model.exploration_fraction , model.exploration_initial_eps , model.exploration_final_eps , model.policy)
+        time_steps = 400_000
+        for i in range (100):
+            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/dqn_baseline_cnn3_eat_pellets_from_beg_2")
+            model.save(f"{model_path}/{(i+2)*time_steps}") 
+
+    elif os.path.exists(model_path):
+        env = env_render
+        obs , _ = env.reset()
+        model_final_path = f"./{model_path}/1600000.zip"
+        model = DQN.load(model_final_path , env = env)
+
+        episodes = 10
+        for ep in range(episodes):
+            done = False
+            while not done:
+                action , next_state = model.predict(obs)
+                obs, reward, terminated, truncated, info = env.step(int(action))
+                print(env.game_score)
+                done = terminated
+        env.close()
+
+
+# if __name__ == "__main__":
+#     os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+#     env = gym.make("pacman-v0", render_mode="human" , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 1)
+#     # print("Checking Environment")
+#     # check_env(env.unwrapped)
+#     # print("done checking environment")
+
+#     obs = env.reset()[0]
+#     done = False
+#     action = 4
+#     while not done:
+#         randaction = env.action_space.sample()
+#         env.render()
+#         obs, reward, terminated, _, _ = env.step(action)
+#         done = terminated 
+#         #print(obs)
+#         print(reward)
+#         print(env.game_score)
+#         if action == 1 and reward == HIT_WALL_PENALITY:
+#             action = 2
+#         elif reward == HIT_WALL_PENALITY:
+#             action = 1
 
 
 
