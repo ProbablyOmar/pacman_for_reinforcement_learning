@@ -17,7 +17,7 @@ import time
 import copy
 
 class GameController(object):
-    def __init__(self, rlTraining=False , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick = 10 , pacman_lives = 1):
+    def __init__(self, rlTraining=False , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick = 10 , pacman_lives = 1 , maze_mode = MAZE3):
         pygame.init()
         self.rlTraining = rlTraining
         self.screen = pygame.display.set_mode(SCREENSIZE, 0, 32)
@@ -34,6 +34,8 @@ class GameController(object):
         self.level = 0
         self.move_mode = move_mode
         self.clock_tick = clock_tick
+
+        self.maze_mode = maze_mode
 
         self.mode = mode
         self.lives = pacman_lives
@@ -105,12 +107,17 @@ class GameController(object):
         self.flashBG = False
         self.background = self.background_norm
 
+
     def startGame(self):
         self.pause.paused = False
-        self.mazedata.loadMaze(self.level)
+        self.mazedata.loadMaze(self.maze_mode)
+        #************************
         mazeFolderPath = Path("./mazes") / (self.mazedata.obj.name)
         mazeFilePath = mazeFolderPath / (self.mazedata.obj.name + ".txt")
-        mazeRotFilePath = mazeFolderPath / (self.mazedata.obj.name + "_rotation.txt")
+
+        mazeFolderROTPath = Path("./mazes") / ("maze1")   
+        mazeRotFilePath = mazeFolderROTPath / ("maze1_rotation.txt")
+        #*************************
         self.mazesprites = MazeSprites(
             mazeFilePath.resolve(), mazeRotFilePath.resolve()
         )
@@ -464,14 +471,12 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=2)
+    game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=2 , maze_mode=RAND_MAZE)
     done = False
     agent_direction=LEFT
 
-    cnt = 0
 
     while not done:
-        cnt+=1
         game.update(render=True)
         #print(game.observation)
         done = game.done
@@ -482,8 +487,6 @@ if __name__ == "__main__":
         elif agent_direction == RIGHT:
             agent_direction = LEFT
 
-        if cnt == 100:
-            game.gameOver = True
         # print ("done: " , game.done)
         # print("gameover: " , game.gameOver)
         # print("win: " , game.win)

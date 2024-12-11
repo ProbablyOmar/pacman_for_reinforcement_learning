@@ -1,4 +1,5 @@
 from constants import *
+import random
 
 
 class MazeBase(object):
@@ -44,6 +45,69 @@ class Maze1(MazeBase):
             RIGHT: (self.addOffset(2, 3),),
         }
 
+class Maze3(MazeBase):
+    def __init__(self):
+        MazeBase.__init__(self)
+        self.name = "maze3"
+        self.portalPairs = {0: ((0, 17), (27, 17))}
+        self.homeoffset = (11.5, 14)
+        self.homenodeconnectLeft = (12, 14)     #(12, 14)
+        self.homenodeconnectRight = (14, 14)
+        self.pacmanStart = (14, 26)    #(14, 26)
+        self.fruitStart = (9, 20)
+        self.ghostNodeDeny = {
+            UP: ((12, 14), (15, 14), (12, 26), (15, 26)),
+            LEFT: (self.addOffset(2, 3),),
+            RIGHT: (self.addOffset(2, 3),),
+        }
+
+class Maze4(MazeBase):
+    def __init__(self):
+        MazeBase.__init__(self)
+        self.name = "maze4"
+        self.portalPairs = {0: ((0, 17), (27, 17))}
+        self.homeoffset = (11.5, 14)
+        self.homenodeconnectLeft = (12, 14)     #(12, 14)
+        self.homenodeconnectRight = (14, 14)
+        self.pacmanStart = (14, 26)    #(14, 26)
+        self.fruitStart = (9, 20)
+        self.ghostNodeDeny = {
+            UP: ((12, 14), (15, 14), (12, 26), (15, 26)),
+            LEFT: (self.addOffset(2, 3),),
+            RIGHT: (self.addOffset(2, 3),),
+        }
+
+class Maze5(MazeBase):
+    def __init__(self):
+        MazeBase.__init__(self)
+        self.name = "maze5"
+        self.portalPairs = {0: ((0, 17), (27, 17))}
+        self.homeoffset = (11.5, 14)
+        self.homenodeconnectLeft = (12, 14)     #(12, 14)
+        self.homenodeconnectRight = (14, 14)
+        self.pacmanStart = (14, 26)    #(14, 26)
+        self.fruitStart = (9, 20)
+        self.ghostNodeDeny = {
+            UP: ((12, 14), (15, 14), (12, 26), (15, 26)),
+            LEFT: (self.addOffset(2, 3),),
+            RIGHT: (self.addOffset(2, 3),),
+        }
+
+class Maze6(MazeBase):
+    def __init__(self):
+        MazeBase.__init__(self)
+        self.name = "maze6"
+        self.portalPairs = {0: ((0, 17), (27, 17))}
+        self.homeoffset = (11.5, 14)
+        self.homenodeconnectLeft = (12, 14)     #(12, 14)
+        self.homenodeconnectRight = (14, 14)
+        self.pacmanStart = (14, 26)    #(14, 26)
+        self.fruitStart = (9, 20)
+        self.ghostNodeDeny = {
+            UP: ((12, 14), (15, 14), (12, 26), (15, 26)),
+            LEFT: (self.addOffset(2, 3),),
+            RIGHT: (self.addOffset(2, 3),),
+        }
 
 class Maze2(MazeBase):
     def __init__(self):
@@ -65,7 +129,12 @@ class Maze2(MazeBase):
 class MazeData(object):
     def __init__(self):
         self.obj = None
-        self.mazedict = {0: Maze1, 1: Maze2}
+        self.mazedict = {0: Maze1, 1: Maze2 , 2 : Maze3 , 3: Maze4 , 4:Maze5 , 5:Maze6}
 
-    def loadMaze(self, level):
-        self.obj = self.mazedict[level % len(self.mazedict)]()
+    def loadMaze(self, maze_mode):
+        if maze_mode == RAND_MAZE:
+            rand_ch = [i for i in range(len(self.mazedict)) if i != 1]
+            rand_idx = random.choice(rand_ch)
+            self.obj = self.mazedict[rand_idx]()
+        else:
+            self.obj = self.mazedict[maze_mode % (len(self.mazedict))]()
