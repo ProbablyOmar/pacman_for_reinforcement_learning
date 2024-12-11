@@ -164,4 +164,8 @@ MAZE5 = 4
 MAZE6 = 5
 RAND_MAZE = 6
 
+#pacman initial position mode
+NORMAL_PAC_POS = 0
+RANDOM_PAC_POS = 1
+
 

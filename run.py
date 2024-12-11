@@ -17,7 +17,7 @@ import time
 import copy
 
 class GameController(object):
-    def __init__(self, rlTraining=False , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick = 10 , pacman_lives = 1 , maze_mode = MAZE3):
+    def __init__(self, rlTraining=False , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick = 10 , pacman_lives = 1 , maze_mode = MAZE3 , pac_pos_mode = NORMAL_PAC_POS):
         pygame.init()
         self.rlTraining = rlTraining
         self.screen = pygame.display.set_mode(SCREENSIZE, 0, 32)
@@ -36,6 +36,7 @@ class GameController(object):
         self.clock_tick = clock_tick
 
         self.maze_mode = maze_mode
+        self.pac_pos_mode = pac_pos_mode
 
         self.mode = mode
         self.lives = pacman_lives
@@ -110,7 +111,7 @@ class GameController(object):
 
     def startGame(self):
         self.pause.paused = False
-        self.mazedata.loadMaze(self.maze_mode)
+        self.mazedata.loadMaze(self.maze_mode , self.pac_pos_mode)
         #************************
         mazeFolderPath = Path("./mazes") / (self.mazedata.obj.name)
         mazeFilePath = mazeFolderPath / (self.mazedata.obj.name + ".txt")
@@ -471,7 +472,7 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=2 , maze_mode=RAND_MAZE)
+    game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=2 , maze_mode=MAZE4 , pac_pos_mode=RANDOM_PAC_POS)
     done = False
     agent_direction=LEFT
 
