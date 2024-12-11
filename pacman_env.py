@@ -141,8 +141,8 @@ class PacmanEnv(gym.Env):
                         self.useless_steps = 0
                 # else:
                 #     self.useless_steps = 0
-            if reward > 0:
-                print(reward)
+            # if reward > 0:
+            #     print(reward)
             return observation, reward, terminated, truncated, info
 
 
@@ -168,7 +168,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(model_path):  
         os.makedirs(model_path) 
-        env = env_render
+        env = env_not_render
         obs , _ = env.reset()
 
         policy_kwargs = dict(
