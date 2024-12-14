@@ -156,8 +156,8 @@ class PacmanEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = RAND_MAZE)
-    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1,  maze_mode = RAND_MAZE)
+    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = RAND_MAZE , pac_pos_mode=RANDOM_PAC_POS)
+    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1,  maze_mode = RAND_MAZE , pac_pos_mode=RANDOM_PAC_POS)
     
     model_path = "./models/dqn_baseline_cnn3_eat_pellets_rand_maze"
 
