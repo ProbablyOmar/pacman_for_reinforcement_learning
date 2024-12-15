@@ -16,8 +16,9 @@ import numpy as np
 import time
 import copy
 
+
 class GameController(object):
-    def __init__(self, rlTraining=False , mode = NORMAL_MODE):
+    def __init__(self, rlTraining=False, mode=NORMAL_MODE):
         pygame.init()
         self.rlTraining = rlTraining
         self.screen = pygame.display.set_mode(SCREENSIZE, 0, 32)
@@ -44,6 +45,7 @@ class GameController(object):
         self.flashBG = False
         self.flashTime = 0.2
         self.flashTimer = 0
+        self.pacmanEaten = 0
         self.fruitcaptured = []
         self.mazedata = MazeData()
         self.gameOver = False
@@ -52,12 +54,11 @@ class GameController(object):
         self.observation = None
         self.startGame()
 
-
     def restartGame(self):
         self.pacman.can_eat = True
-        #self.gameOver = False
+        # self.gameOver = False
         self.textgroup.hideText()
-        #self.win = False
+        # self.win = False
         # self.lives = 5
         if self.mode == NORMAL_MODE:
             self.lives = 5
@@ -68,6 +69,7 @@ class GameController(object):
         self.fruit = None
         self.startGame()
         self.score = 0
+        self.pacmanEaten = 0
         self.textgroup.updateScore(self.score)
         self.textgroup.updateLevel(self.level)
         if not (self.rlTraining):
@@ -85,7 +87,7 @@ class GameController(object):
 
     def nextLevel(self):
         self.showEntities()
-        self.level += 1   ##change this if you ant to update the leve not to play the same level again
+        self.level += 1  ##change this if you ant to update the leve not to play the same level again
         if self.level >= NUMBEROFLEVELS:
             self.win = True
         self.pause.pasued = False
@@ -108,6 +110,7 @@ class GameController(object):
 
     def startGame(self):
         self.pause.paused = False
+        self.pacmanEaten = 0
         self.mazedata.loadMaze(self.level)
         mazeFolderPath = Path("./mazes") / (self.mazedata.obj.name)
         mazeFilePath = mazeFolderPath / (self.mazedata.obj.name + ".txt")
@@ -154,32 +157,33 @@ class GameController(object):
         self.set_maze_map = self.pellets.map_init_pell_rewards
         self.maze_map = copy.deepcopy(self.set_maze_map)
         self.observation = self.maze_map
-        
 
     # def update_rate (self , update_clock):
     #     self.update_clock.tick(update_clock) / 1000.0
     #     self.take_step = True
 
-    def update(self, agent_direction=None, render=True, clocktick=60):
+    def update(self, agent_directions=None, render=True, clocktick=60):
         self.RLreward = 0
-        
+
         ### check if the pacman hits a wall
-        pac_hit_wall = self.pacman.hit_wall(self.set_maze_map , agent_direction)
+        pac_hit_wall = self.pacman.hit_wall(
+            self.set_maze_map, agent_directions["pacman"]
+        )
         if pac_hit_wall:
             self.updateScore(HIT_WALL_PENALITY)
         ################################################
-        
+
         dt = self.clock.tick(clocktick) / 1000.0
         if self.pacman.alive:
             if not self.pause.paused:
-                self.pacman.update(dt, agent_direction)
+                self.pacman.update(dt, agent_directions["pacman"])
         else:
-            self.pacman.update(dt, agent_direction)
+            self.pacman.update(dt, agent_directions["pacman"])
 
         self.textgroup.update(dt)
         self.pellets.update(dt)
         if not self.pause.paused or self.rlTraining == True:
-            self.ghosts.update(dt)
+            self.ghosts.update(dt, agent_directions["ghost"])
             if self.fruit is not None:
                 self.fruit.update(dt)
             self.checkPelletEvents()
@@ -194,7 +198,6 @@ class GameController(object):
             self.observation = self.maze_map
             del self.maze_map
 
-        
         self.done = self.gameOver or self.win
         if self.RLreward == 0:
             self.updateScore(TIME_PENALITY)
@@ -207,14 +210,13 @@ class GameController(object):
                     self.background = self.background_flash
                 else:
                     self.background = self.background_norm
-                    
+
         afterPauseMethod = self.pause.update(dt)
         if afterPauseMethod is not None:
             afterPauseMethod()
         self.checkEvents()
         if render:
             self.render()
-
 
     def updateScore(self, points):
         self.RLreward = points
@@ -279,10 +281,11 @@ class GameController(object):
                 elif ghost.mode.current is not SPAWN:
                     if ghost.can_eat:
                         if self.pacman.alive:
+                            self.pacmanEaten += 1
                             self.pacman.can_eat = False
                             self.lives -= 1
                             self.updateScore(ghost.ghost_penality)
-                            ## increase the ghost penality each time you lose a life 
+                            ## increase the ghost penality each time you lose a life
                             self.ghosts.update_penality_points()
                             self.lifesprites.removeImage()
                             self.pacman.die()
@@ -304,10 +307,10 @@ class GameController(object):
 
     def checkPelletEvents(self):
         pellet = self.pacman.eatPellets(self.pellets.pelletList)
-        #print(f"Pac-Man Position: {self.pacman.tile}")
+        # print(f"Pac-Man Position: {self.pacman.tile}")
         if pellet:
-            #print(f"Pellet Eaten at: {pellet.tile}, Reward: {pellet.points}")
-            ###update the pellet when eaten and delete the pellet rewards from it 
+            # print(f"Pellet Eaten at: {pellet.tile}, Reward: {pellet.points}")
+            ###update the pellet when eaten and delete the pellet rewards from it
             if pellet.name == PELLET:
                 self.set_maze_map[pellet.tile[1]][pellet.tile[0]] -= PELLET_MAZE
             elif pellet.name == POWERPELLET:
@@ -326,7 +329,7 @@ class GameController(object):
 
         if self.pellets.isEmpty():
             self.updateScore(FINISH_LEVEL_REWARD)
-            #self.win = True
+            # self.win = True
             self.flashBG = False
             self.hideEntities()
             self.nextLevel()  ##self.pause.setPause(pauseTime=3, func=self.nextLevel)
@@ -335,15 +338,15 @@ class GameController(object):
         if self.pellets.numEaten == 50 or self.pellets.numEaten == 140:
             if self.fruit is None:
                 self.fruit = Fruit(self.nodes.getNodeFromTiles(13, 20), self.level)
-                #### update the maze map with the fruit reward 
+                #### update the maze map with the fruit reward
                 self.set_maze_map[self.fruit.tile[1]][self.fruit.tile[0]] = FRUIT_MAZE
                 ###
 
         if self.fruit is not None:
-            #### update the maze map with the fruit reward 
+            #### update the maze map with the fruit reward
             self.set_maze_map[self.fruit.tile[1]][self.fruit.tile[0]] = FRUIT_MAZE
             ###
-            
+
             if self.pacman.collideCheck(self.fruit):
                 self.set_maze_map[self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
                 self.updateScore(self.fruit.points)
@@ -387,17 +390,17 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SAFE_MODE)
+    game = GameController(rlTraining=True, mode=SAFE_MODE)
     done = False
     while not done:
         game.update(render=True)
-        #print(game.observation)
+        # print(game.observation)
         done = game.done
         # print ("done: " , game.done)
         # print("gameover: " , game.gameOver)
         # print("win: " , game.win)
-        #print(game.score)
-        #print(game.RLreward)
+        # print(game.score)
+        # print(game.RLreward)
         # print(game.pacman.tile)
         # print(game.maze_map)
         # print("*************************************" , game.RLreward)
@@ -405,4 +408,3 @@ if __name__ == "__main__":
     # print ("done: " , game.done)
     # print("gameover: " , game.gameOver)
     # print("win: " , game.win)
-

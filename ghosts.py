@@ -21,16 +21,18 @@ class Ghost(Entity):
         self.homeNode = node
         self.can_eat = True
         self.can_be_eaten = True
-        
 
-    def update(self, dt):
+    def update(self, dt, direction=None):
         self.sprites.update(dt)
         self.mode.update(dt)
         if self.mode.current is SCATTER:
             self.scatter()
         elif self.mode.current is CHASE:
             self.chase()
-        Entity.update(self, dt)
+        if direction != None:
+            Entity.update(self, dt, direction)
+        else:
+            Entity.update(self, dt)
 
     def startFreight(self):
         self.mode.setFreightMode()
@@ -148,9 +150,12 @@ class GhostGroup(object):
     def __getitem__(self, index):
         return self.ghosts[index]
 
-    def update(self, dt):
+    def update(self, dt, ghostDirection=None):
         for ghost in self:
-            ghost.update(dt)
+            if ghostDirection != None:
+                ghost.update(dt, ghostDirection)
+            else:
+                ghost.update(dt)
 
     def startFreight(self):
         for ghost in self:
@@ -168,6 +173,7 @@ class GhostGroup(object):
     def update_penality_points(self):
         for ghost in self:
             ghost.ghost_penality -= GHOST_UPDATE_PENALITY
+
     # def updatePoints(self):
     #     for ghost in self:
     #         ghost.points *= 2

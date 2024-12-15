@@ -77,20 +77,23 @@ class PacmanEnv(ParallelEnv):
         while True:
             if self.render_mode == "human":
                 self.game.update(
-                    agent_direction=pacman_action,
+                    agent_directions={"pacman": pacman_action, "ghost": ghost_action},
                     render=True,
                     clocktick=self.metadata["render_fps"],
                 )
             else:
                 self.game.update(
-                    agent_direction=pacman_action,
+                    agent_direction={"pacman": pacman_action, "ghost": ghost_action},
                     render=False,
                     clocktick=self.metadata["render_fps"],
                 )
 
+            ghostReward = (
+                1 / (self.game.ghosts[0].position - self.game.pacman.positon)
+            ) * 50 + self.game.pacmanEaten * 500
             terminated = {a: self.game.done for a in self.agents}
             truncated = {a: False for a in self.agents}
-            reward = {"pacman": self.game.RLreward, "ghost": 0}
+            reward = {"pacman": self.game.RLreward, "ghost": ghostReward}
             observations = self._getobs()
             info = {a: {} for a in self.agents}
 
