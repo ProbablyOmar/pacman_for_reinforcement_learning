@@ -168,7 +168,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(model_path):  
         os.makedirs(model_path) 
-        env = env_render
+        env = env_not_render
         obs , _ = env.reset()
 
         policy_kwargs = dict(
