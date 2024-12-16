@@ -491,7 +491,7 @@ if __name__ == "__main__":
         # print ("done: " , game.done)
         # print("gameover: " , game.gameOver)
         # print("win: " , game.win)
-        #print(game.score)
+        print(game.score)
         #print(game.RLreward)
         # print(game.pacman.tile)
         # print(game.maze_map)
