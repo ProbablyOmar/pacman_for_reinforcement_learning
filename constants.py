@@ -76,10 +76,10 @@ GAMEOVERTXT = 4
 # #Rewards used in pacmn_eat_pellets2
 
 
-TIME_PENALITY = -0.5  ### -.01
+TIME_PENALITY = 0  ### -.01
 RAND_PENALITY = 0    ## this will only be in the safe mode training once ghosts are in disable it
 PELLET_LOST_PENALITY = 0
-HIT_WALL_PENALITY = -3.5 
+HIT_WALL_PENALITY = 0 
 
 PELLET_REWARD_UPDATE = 0
 PELLET_REWARD = 10

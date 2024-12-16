@@ -8,7 +8,7 @@ from gymnasium import spaces
 from run import GameController
 from constants import *
 from DQN_model import CustomCNN , CustomCNN_eat_pellets2 , CustomCNN_eat_pellets3 , CustomCNN_eat_pellets5 , CustomCNN_eat_pellets_from_beg_2
-from stable_baselines3 import DQN
+from stable_baselines3 import DQN , PPO
 from modified_tensorboard import TensorboardCallback
 from stable_baselines3.dqn import MultiInputPolicy
 import os
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = RAND_MAZE)
     env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1,  maze_mode = RAND_MAZE)
     
-    model_path = "./models/dqn_baseline_cnn3_eat_pellets_rand_maze"
+    model_path = "./models/eat_pellets_PPO"
 
     log_path = "./logs/fit"
    
@@ -168,36 +168,36 @@ if __name__ == "__main__":
 
     if not os.path.exists(model_path):  
         os.makedirs(model_path) 
-        env = env_not_render
+        env = env_render
         obs , _ = env.reset()
 
         policy_kwargs = dict(
             features_extractor_class=CustomCNN,
-            features_extractor_kwargs=dict(features_dim=1024),
+            features_extractor_kwargs=dict(features_dim=256),
         )
-        model = DQN(
+        model = PPO(
             "CnnPolicy" , 
             env , 
-            learning_rate  = 0.00005 , 
-            learning_starts  = 2000,
-            batch_size= 32,   #32
-            gamma = 0.97,
-            #train_freq = (1, "episode"),
-            gradient_steps = 4,
-            target_update_interval=150,
-            exploration_fraction=1,
-            exploration_initial_eps=1,
-            exploration_final_eps=0.3,
+            # learning_rate = 0.0003 , 
+            # learning_starts  = 2000,
+            # batch_size= 64,   #32
+            # gamma = 0.97,
+            # #train_freq = (1, "episode"),
+            # gradient_steps = 4,
+            # target_update_interval=150,
+            # exploration_fraction=1,
+            # exploration_initial_eps=1,
+            # exploration_final_eps=0.3,
 
             policy_kwargs = policy_kwargs , 
-            verbose = 1 , 
+            # verbose = 1 , 
             tensorboard_log = log_path
         )
 
         #print("here ***********: " , model.exploration_fraction , model.exploration_initial_eps , model.exploration_final_eps , model.policy)
         time_steps = 400_000
         for i in range (100):
-            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/dqn_baseline_cnn3_eat_pellets_rand_maze")
+            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/eat_pellets_PPO")
             model.save(f"{model_path}/{(i+2)*time_steps}") 
 
     elif os.path.exists(model_path):
