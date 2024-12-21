@@ -182,6 +182,7 @@ class GameController(object):
     #     self.take_step = True
 
     def update(self, agent_direction=None, render=True):
+        # print(agent_direction)
         self.RLreward = 0
         #print ("order direction: " , agent_direction , " pacman direction: " , self.pacman.direction)
         ### check if the pacman is changing directions with no فايدة
@@ -472,7 +473,7 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=2 , maze_mode=MAZE4 , pac_pos_mode=RANDOM_PAC_POS)
+    game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=2 , maze_mode=MAZE4 , pac_pos_mode=NORMAL_PAC_POS)
     done = False
     agent_direction=LEFT
 
@@ -491,11 +492,12 @@ if __name__ == "__main__":
         # print ("done: " , game.done)
         # print("gameover: " , game.gameOver)
         # print("win: " , game.win)
-        print(game.score)
+        # print(game.score)
         #print(game.RLreward)
         # print(game.pacman.tile)
         # print(game.maze_map)
-        #print("*************************************" , game.RLreward)
+        if game.RLreward == HIT_WALL_PENALITY:
+            print("*************************************" , game.RLreward)
         #print("*************************************" , game.pacman.tile)
     # print ("done: " , game.done)
     # print("gameover: " , game.gameOver)
