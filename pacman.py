@@ -7,7 +7,7 @@ from sprites import PacmanSprites
 
 
 class Pacman(Entity):
-    def __init__(self, node):
+    def __init__(self, node , move_mode = DISCRETE_STEPS_MODE):
         Entity.__init__(self, node)
         self.name = PACMAN
         self.color = YELLOW
@@ -15,9 +15,13 @@ class Pacman(Entity):
         self.setBetweenNodes(LEFT)
         self.alive = True
         self.sprites = PacmanSprites(self)
+        self.can_eat = True
+        self.move_mode = move_mode
+
 
     def reset(self):
         Entity.reset(self)
+        self.can_eat = True
         self.direction = LEFT
         self.setBetweenNodes(LEFT)
         self.alive = True
@@ -29,9 +33,10 @@ class Pacman(Entity):
         self.direction = STOP
 
     def eatPellets(self, pelletList):
-        for pellet in pelletList:
-            if self.collideCheck(pellet):
-                return pellet
+        if self.can_eat:
+            for pellet in pelletList:
+                if self.tile_collideCheck(pellet):
+                    return pellet
         return None
 
     def collideCheck(self, other):
@@ -42,17 +47,23 @@ class Pacman(Entity):
             return True
         return False
 
+    def tile_collideCheck(self, other):
+        if self.tile == other.tile:
+            return True
+        return False
+
     def collideGhost(self, ghost):
-        return self.collideCheck(ghost)
+        return self.tile_collideCheck(ghost)
 
     def update(self, dt, agent_direction=None):
-        self.sprites.update(dt)
-        self.position += self.directions[self.direction] * self.speed * dt
-        if agent_direction == None:
-            direction = self.getValidKey()
-        else:
-            direction = agent_direction
-        if self.overshotTarget():
+        if self.move_mode == DISCRETE_STEPS_MODE:
+            self.sprites.update(dt)
+            #self.position += self.directions[self.direction] * self.speed * dt
+            if agent_direction == None:
+                direction = self.getValidKey()
+            else:
+                direction = agent_direction
+            #if self.overshotTarget():
             self.node = self.target
             if self.node.neighbors[PORTAL] is not None:
                 self.node = self.node.neighbors[PORTAL]
@@ -65,9 +76,34 @@ class Pacman(Entity):
             if self.target == self.node:
                 self.direction = STOP
             self.setPosition()
-        else:
+            #else:
             if self.oppositeDirection(direction):
                 self.reverseDirection()
+
+        elif self.move_mode == CONT_STEPS_MODE:
+            self.sprites.update(dt)
+            self.position += self.directions[self.direction] * self.speed * dt
+            if agent_direction == None:
+                direction = self.getValidKey()
+            else:
+                direction = agent_direction
+            if self.overshotTarget():
+                self.node = self.target
+                if self.node.neighbors[PORTAL] is not None:
+                    self.node = self.node.neighbors[PORTAL]
+                self.target = self.getNewTarget(direction)
+                if self.target is not self.node:
+                    self.direction = direction
+                else:
+                    self.target = self.getNewTarget(self.direction)
+
+                if self.target == self.node:
+                    self.direction = STOP
+                self.setPosition()
+            else:
+                if self.oppositeDirection(direction):
+                    self.reverseDirection()
+
 
     def getValidKey(self):
         key_pressed = pygame.key.get_pressed()

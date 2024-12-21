@@ -12,8 +12,8 @@ class Fruit(Entity):
         self.lifespan = 5
         self.timer = 0
         self.destroy = False
-        self.points = 100 + 20 * level
-        self.setBetweenNodes(RIGHT)
+        self.points = FRUIT_REWARD 
+        #self.setBetweenNodes(RIGHT)
         self.sprites = FruitSprites(self, level)
 
     def update(self, dt):

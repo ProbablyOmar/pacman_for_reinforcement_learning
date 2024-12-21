@@ -11,13 +11,17 @@ class Ghost(Entity):
     def __init__(self, node, pacman=None, blinky=None):
         Entity.__init__(self, node)
         self.name = GHOST
-        self.points = 200
+        self.points = GHOST_REWARD
+        self.ghost_penality = GHOST_PENALITY
         self.goal = Vector2()
         self.directionMethod = self.goalDirection
         self.pacman = pacman
         self.mode = ModeController(self)
         self.blinky = blinky
         self.homeNode = node
+        self.can_eat = True
+        self.can_be_eaten = True
+        
 
     def update(self, dt):
         self.sprites.update(dt)
@@ -126,23 +130,29 @@ class Clyde(Ghost):
 
     def reset(self):
         Entity.reset(self)
-        self.points = 200
+        self.points = GHOST_REWARD
         self.directionMethod = self.goalDirection
 
 
 class GhostGroup(object):
-    def __init__(self, node, pacman):
+    def __init__(self, node, pacman , move_mode = DISCRETE_STEPS_MODE):
         self.blinky = Blinky(node, pacman)
         self.pinky = Pinky(node, pacman)
         self.inky = Inky(node, pacman, self.blinky)
         self.clyde = Clyde(node, pacman)
         self.ghosts = [self.blinky, self.pinky, self.inky, self.clyde]
+        self.move_mode = move_mode
+        self.set_move_mode()
 
     def __iter__(self):
         return iter(self.ghosts)
 
     def __getitem__(self, index):
         return self.ghosts[index]
+
+    def set_move_mode(self):
+        for ghost in self.ghosts:
+            ghost.move_mode = self.move_mode
 
     def update(self, dt):
         for ghost in self:
@@ -159,11 +169,18 @@ class GhostGroup(object):
 
     def updatePoints(self):
         for ghost in self:
-            ghost.points *= 2
+            ghost.points += GHOST_UPDATE_REWARD
+
+    def update_penality_points(self):
+        for ghost in self:
+            ghost.ghost_penality -= GHOST_UPDATE_PENALITY
+    # def updatePoints(self):
+    #     for ghost in self:
+    #         ghost.points *= 2
 
     def resetPoints(self):
         for ghost in self:
-            ghost.points = 200
+            ghost.points = GHOST_REWARD
 
     def reset(self):
         for ghost in self:
