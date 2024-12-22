@@ -23,14 +23,60 @@ class Ghost(Entity):
         self.can_be_eaten = True
         
 
-    def update(self, dt):
-        self.sprites.update(dt)
-        self.mode.update(dt)
-        if self.mode.current is SCATTER:
-            self.scatter()
-        elif self.mode.current is CHASE:
-            self.chase()
-        Entity.update(self, dt)
+    def update(self, dt , agent_direction=None):
+        if agent_direction == None:
+            self.sprites.update(dt)
+            self.mode.update(dt)
+            if self.mode.current is SCATTER:
+                self.scatter()
+            elif self.mode.current is CHASE:
+                self.chase()
+            Entity.update(self, dt)
+
+        else:
+            if self.move_mode == DISCRETE_STEPS_MODE:
+                self.sprites.update(dt)
+                #self.position += self.directions[self.direction] * self.speed * dt
+                direction = agent_direction
+                    
+                #if self.overshotTarget():
+                self.node = self.target
+                if self.node.neighbors[PORTAL] is not None:
+                    self.node = self.node.neighbors[PORTAL]
+                self.target = self.getNewTarget(direction)
+                if self.target is not self.node:
+                    self.direction = direction
+                else:
+                    self.target = self.getNewTarget(self.direction)
+
+                if self.target == self.node:
+                    self.direction = STOP
+                self.setPosition()
+                #else:
+                if self.oppositeDirection(direction):
+                    self.reverseDirection()
+
+            elif self.move_mode == CONT_STEPS_MODE:
+                self.sprites.update(dt)
+                self.position += self.directions[self.direction] * self.speed * dt
+                direction = agent_direction
+                    
+                if self.overshotTarget():
+                    self.node = self.target
+                    if self.node.neighbors[PORTAL] is not None:
+                        self.node = self.node.neighbors[PORTAL]
+                    self.target = self.getNewTarget(direction)
+                    if self.target is not self.node:
+                        self.direction = direction
+                    else:
+                        self.target = self.getNewTarget(self.direction)
+
+                    if self.target == self.node:
+                        self.direction = STOP
+                    self.setPosition()
+                else:
+                    if self.oppositeDirection(direction):
+                        self.reverseDirection()
 
     def startFreight(self):
         self.mode.setFreightMode()
@@ -135,12 +181,20 @@ class Clyde(Ghost):
 
 
 class GhostGroup(object):
-    def __init__(self, node, pacman , move_mode = DISCRETE_STEPS_MODE):
+    def __init__(self, node, pacman , move_mode = DISCRETE_STEPS_MODE , mode = NORMAL_MODE):
         self.blinky = Blinky(node, pacman)
         self.pinky = Pinky(node, pacman)
         self.inky = Inky(node, pacman, self.blinky)
         self.clyde = Clyde(node, pacman)
-        self.ghosts = [self.blinky, self.pinky, self.inky, self.clyde]
+        if mode == NORMAL_MODE:
+            self.ghosts = [self.blinky, self.pinky, self.inky, self.clyde]
+        elif mode == SCARY_1_MODE:
+            self.ghosts = [self.blinky]
+        elif mode == SCARY_2_MODE: 
+            self.ghosts = [self.blinky, self.pinky]
+        elif mode == SAFE_MODE:
+            self.ghosts = []
+
         self.move_mode = move_mode
         self.set_move_mode()
 
@@ -154,9 +208,12 @@ class GhostGroup(object):
         for ghost in self.ghosts:
             ghost.move_mode = self.move_mode
 
-    def update(self, dt):
+    def update(self, dt, ghostDirection=None):
         for ghost in self:
-            ghost.update(dt)
+            if ghostDirection != None:
+                ghost.update(dt, ghostDirection)
+            else:
+                ghost.update(dt)
 
     def startFreight(self):
         for ghost in self:

@@ -49,6 +49,8 @@ class GameController(object):
         self.flashBG = False
         self.flashTime = 0.2
         self.flashTimer = 0
+
+        self.pacmanEaten = 0
         self.fruitcaptured = []
         self.mazedata = MazeData()
         self.gameOver = False
@@ -70,6 +72,7 @@ class GameController(object):
         self.fruit = None
         self.startGame()
         self.score = 0
+        self.pacmanEaten = 0
         self.textgroup.updateScore(self.score)
         self.textgroup.updateLevel(self.level)
         if not (self.rlTraining):
@@ -111,6 +114,7 @@ class GameController(object):
 
     def startGame(self):
         self.pause.paused = False
+        self.pacmanEaten = 0
         self.mazedata.loadMaze(self.maze_mode , self.pac_pos_mode)
         #************************
         mazeFolderPath = Path("./mazes") / (self.mazedata.obj.name)
@@ -131,22 +135,41 @@ class GameController(object):
             move_mode= self.move_mode
         )
         self.pellets = PelletGroup(mazeFilePath.resolve())
-        self.ghosts = GhostGroup(self.nodes.getStartTempNode(), self.pacman , move_mode=self.move_mode)
-        self.ghosts.pinky.setStartNode(
-            self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 3))
-        )
-        self.ghosts.inky.setStartNode(
-            self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(0, 3))
-        )
-        self.ghosts.clyde.setStartNode(
-            self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(4, 3))
-        )
-        self.ghosts.setSpawnNode(
-            self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 3))
-        )
-        self.ghosts.blinky.setStartNode(
-            self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 0))
-        )
+        self.ghosts = GhostGroup(self.nodes.getStartTempNode(), self.pacman , move_mode=self.move_mode , mode = self.mode)
+        if self.mode == NORMAL_MODE:
+            self.ghosts.pinky.setStartNode(
+                self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 3))
+            )
+            self.ghosts.inky.setStartNode(
+                self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(0, 3))
+            )
+            self.ghosts.clyde.setStartNode(
+                self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(4, 3))
+            )
+            self.ghosts.setSpawnNode(
+                self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 3))
+            )
+            self.ghosts.blinky.setStartNode(
+                self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 0))
+            )
+
+        elif self.mode  == SCARY_1_MODE:
+            self.ghosts.setSpawnNode(
+                self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 3))
+            )
+            self.ghosts.blinky.setStartNode(
+                self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 0))
+            )
+        elif self.mode == SCARY_2_MODE:
+            self.ghosts.pinky.setStartNode(
+                self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 3))
+            )
+            self.ghosts.setSpawnNode(
+                self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 3))
+            )
+            self.ghosts.blinky.setStartNode(
+                self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 0))
+            )
 
         if self.mode == SAFE_MODE:
             for ghost in self.ghosts:
@@ -154,22 +177,23 @@ class GameController(object):
                 ghost.can_be_eaten = False
                 ghost.can_eat = False
 
-        elif self.mode == SCARY_1_MODE:
-            for i in range(1 , len(self.ghosts.ghosts)):
-                #self.ghosts[i].visible = False
-                self.ghosts[i].can_be_eaten = False
-                self.ghosts[i].can_eat = False 
+        # elif self.mode == SCARY_1_MODE:
+        #     for i in range(1 , len(self.ghosts.ghosts)):
+        #         #self.ghosts[i].visible = False
+        #         self.ghosts[i].can_be_eaten = False
+        #         self.ghosts[i].can_eat = False 
 
-        elif self.mode == SCARY_2_MODE:
-            for i in range(2 , len(self.ghosts.ghosts)):
-                #self.ghosts[i].visible = False
-                self.ghosts[i].can_be_eaten = False
-                self.ghosts[i].can_eat = False            
+        # elif self.mode == SCARY_2_MODE:
+        #     for i in range(2 , len(self.ghosts.ghosts)):
+        #         #self.ghosts[i].visible = False
+        #         self.ghosts[i].can_be_eaten = False
+        #         self.ghosts[i].can_eat = False            
 
         self.nodes.denyHomeAccess(self.pacman)
         self.nodes.denyHomeAccessList(self.ghosts)
-        self.ghosts.inky.startNode.denyAccess(RIGHT, self.ghosts.inky)
-        self.ghosts.clyde.startNode.denyAccess(LEFT, self.ghosts.clyde)
+        if self.mode == NORMAL_MODE:
+            self.ghosts.inky.startNode.denyAccess(RIGHT, self.ghosts.inky)
+            self.ghosts.clyde.startNode.denyAccess(LEFT, self.ghosts.clyde)
         self.mazedata.obj.denyGhostsAccess(self.ghosts, self.nodes)
 
         self.set_maze_map = self.pellets.map_init_pell_rewards
@@ -181,19 +205,19 @@ class GameController(object):
     #     self.update_clock.tick(update_clock) / 1000.0
     #     self.take_step = True
 
-    def update(self, agent_direction=None, render=True):
+    def update(self, agent_directions=None, render=True):
         # print(agent_direction)
         self.RLreward = 0
         #print ("order direction: " , agent_direction , " pacman direction: " , self.pacman.direction)
         ### check if the pacman is changing directions with no فايدة
         if self.rlTraining ==True and self.mode == SAFE_MODE:
-            if agent_direction == - self.pacman.direction and agent_direction != STOP:
-                self.updateScore(RAND_PENALITY  )
+            if agent_directions["pacman"] == - self.pacman.direction and agent_directions["pacman"] != STOP:
+                self.updateScore(RAND_PENALITY)
         ################################################
 
         
         ### check if the pacman hits a wall
-        pac_hit_wall = self.pacman.hit_wall(self.set_maze_map , agent_direction)
+        pac_hit_wall = self.pacman.hit_wall(self.set_maze_map , agent_directions["pacman"])
         if pac_hit_wall:
             self.updateScore(HIT_WALL_PENALITY)
         ################################################
@@ -201,14 +225,14 @@ class GameController(object):
         dt = self.clock.tick(self.clock_tick) / 1000.0
         if self.pacman.alive:
             if not self.pause.paused:
-                self.pacman.update(dt, agent_direction)
+                self.pacman.update(dt, agent_directions["pacman"])
         else:
-            self.pacman.update(dt, agent_direction)
+            self.pacman.update(dt, agent_directions["pacman"])
 
         self.textgroup.update(dt)
         self.pellets.update(dt)
         if not self.pause.paused or self.rlTraining == True:
-            self.ghosts.update(dt)
+            self.ghosts.update(dt,agent_directions["ghost"])
             if self.fruit is not None:
                 self.fruit.update(dt)
             self.checkPelletEvents()
@@ -362,6 +386,7 @@ class GameController(object):
                 elif ghost.mode.current is not SPAWN:
                     if ghost.can_eat:
                         if self.pacman.alive:
+                            self.pacmanEaten = 1
                             self.pacman.can_eat = False
                             self.lives -= 1
                             self.updateScore(ghost.ghost_penality)
@@ -473,21 +498,25 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=2 , maze_mode=MAZE4 , pac_pos_mode=NORMAL_PAC_POS)
+    game = GameController(rlTraining=True , mode = SCARY_1_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=5 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
     done = False
-    agent_direction=LEFT
-
+    agent_directions = {"pacman" : LEFT , "ghost" : LEFT}
 
     while not done:
-        game.update(render=True)
+        game.update(render=True , agent_directions=agent_directions)
         #print(game.observation)
         done = game.done
         #print("direction: ", game.pacman.direction)
 
-        if agent_direction == LEFT:
-            agent_direction = RIGHT
-        elif agent_direction == RIGHT:
-            agent_direction = LEFT
+        # if agent_directions["pacman"] == LEFT:
+        #     agent_directions["pacman"] = RIGHT
+        # elif agent_directions["pacman"] == RIGHT:
+        #     agent_directions["pacman"] = LEFT
+
+        # if agent_directions["ghost"] == LEFT:
+        #     agent_directions["ghost"] = RIGHT
+        # elif agent_directions["ghost"] == RIGHT:
+        #     agent_directions["ghost"] = LEFT
 
         # print ("done: " , game.done)
         # print("gameover: " , game.gameOver)
@@ -496,8 +525,8 @@ if __name__ == "__main__":
         #print(game.RLreward)
         # print(game.pacman.tile)
         # print(game.maze_map)
-        if game.RLreward == HIT_WALL_PENALITY:
-            print("*************************************" , game.RLreward)
+        # if game.RLreward == HIT_WALL_PENALITY:
+        #     print("*************************************" , game.RLreward)
         #print("*************************************" , game.pacman.tile)
     # print ("done: " , game.done)
     # print("gameover: " , game.gameOver)
