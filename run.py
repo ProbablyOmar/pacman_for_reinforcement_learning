@@ -184,13 +184,8 @@ class GameController(object):
     def update(self, agent_direction=None, render=True):
         # print(agent_direction)
         self.RLreward = 0
+        prev_pac_direction = self.pacman.direction
         #print ("order direction: " , agent_direction , " pacman direction: " , self.pacman.direction)
-        ### check if the pacman is changing directions with no فايدة
-        if self.rlTraining ==True and self.mode == SAFE_MODE:
-            if agent_direction == - self.pacman.direction and agent_direction != STOP:
-                self.updateScore(RAND_PENALITY  )
-        ################################################
-
         
         ### check if the pacman hits a wall
         pac_hit_wall = self.pacman.hit_wall(self.set_maze_map , agent_direction)
@@ -227,8 +222,15 @@ class GameController(object):
         self.done = self.gameOver or self.win
         ## penalize the leftover pellets
         
-        if self.done == True:
-            self.updateScore(PELLET_LOST_PENALITY * len(self.pellets.pelletList))
+        # if self.done == True:
+        #     self.updateScore(PELLET_LOST_PENALITY * len(self.pellets.pelletList))
+
+        ### check if the pacman is changing directions with no فايدة
+        if self.rlTraining ==True and self.mode == SAFE_MODE:
+            if agent_direction == - prev_pac_direction and agent_direction != STOP:
+                self.updateScore(RAND_PENALITY)
+        ################################################
+
         if self.RLreward == 0:
             self.updateScore(TIME_PENALITY)
 
@@ -250,7 +252,7 @@ class GameController(object):
 
 
     def updateScore(self, points):
-        if self.RLreward == RAND_PENALITY or self.RLreward == PELLET_LOST_PENALITY:
+        if self.RLreward == RAND_PENALITY:
             self.RLreward += points
         else:
             self.RLreward = points
@@ -479,7 +481,7 @@ if __name__ == "__main__":
 
 
     while not done:
-        game.update(render=True)
+        game.update(render=True )
         #print(game.observation)
         done = game.done
         #print("direction: ", game.pacman.direction)
@@ -493,11 +495,11 @@ if __name__ == "__main__":
         # print("gameover: " , game.gameOver)
         # print("win: " , game.win)
         # print(game.score)
-        #print(game.RLreward)
+        print(game.RLreward)
         # print(game.pacman.tile)
         # print(game.maze_map)
-        if game.RLreward == HIT_WALL_PENALITY:
-            print("*************************************" , game.RLreward)
+        # if game.RLreward == HIT_WALL_PENALITY:
+        #     print("*************************************" , game.RLreward)
         #print("*************************************" , game.pacman.tile)
     # print ("done: " , game.done)
     # print("gameover: " , game.gameOver)

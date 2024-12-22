@@ -169,7 +169,7 @@ if __name__ == "__main__":
     env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
     env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 1,  maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
     
-    model_path = "./models/eat_pellets_nature_mod_re_func"
+    model_path = "./models/eat_pellets_nature"
 
     log_path = "./logs/fit"
    
@@ -215,7 +215,7 @@ if __name__ == "__main__":
         #print("here ***********: " , model.exploration_fraction , model.exploration_initial_eps , model.exploration_final_eps , model.policy)
         time_steps = 250_000
         for i in range (200):
-            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/eat_pellets_nature_mod_re_func")
+            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/eat_pellets_nature")
             model.save(f"{model_path}/{(i+2)*time_steps}") 
 
     elif os.path.exists(model_path):
@@ -237,7 +237,7 @@ if __name__ == "__main__":
 
 # if __name__ == "__main__":
 #     os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-#     env = gym.make("pacman-v0", render_mode="human" , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 1 , maze_mode = MAZE1 , pac_pos_mode = RANDOM_PAC_POS)
+#     env = gym.make("pacman-v0", render_mode="human" , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 1 , maze_mode = MAZE1)
 #     # print("Checking Environment")
 #     # check_env(env.unwrapped)
 #     # print("done checking environment")
@@ -247,58 +247,23 @@ if __name__ == "__main__":
 #     action = 4
 #     num_steps = 1
 #     while not done:
+#         num_steps +=1 
 #         # if num_steps == 10:
 #         #     break
 #         randaction = env.action_space.sample()
 #         env.render()
 #         obs, reward, terminated, _, _ = env.step(action)
 #         done = terminated 
-        
-#         # print("***************************************")
-#         # print(obs.shape)
+#         print("***************************************")
+#         print(obs.shape)
 #         # print(obs[0][0])
 #         # print(obs[0][1])
 #         # print(obs[0][2])
 #         # print(obs[0][3])
-#         print(reward)
-#         # if action == 4:
-#         #     action = 0
-#         # elif action == 0:
-#         #     action = 4
-
-#         # num_steps +=1
-#         # if num_steps > 10:
-#         #     break
+#         # #print(reward)
 #         # #print(env.game_score)
 #         # if action == 1 and reward == HIT_WALL_PENALITY:
 #         #     #print("*****************here")
 #         #     action = 2
 #         # elif reward == HIT_WALL_PENALITY:
 #         #     action = 1
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-   
-
-
-
-
-
-
-
