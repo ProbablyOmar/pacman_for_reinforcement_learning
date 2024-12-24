@@ -216,6 +216,7 @@ class GameController(object):
 
             ##now self.maze_map is ready
             self.observation = self.maze_map
+            print(self.observation)
             del self.maze_map
 
         
@@ -484,6 +485,7 @@ if __name__ == "__main__":
         game.update(render=True )
         #print(game.observation)
         done = game.done
+        #print(done)
         #print("direction: ", game.pacman.direction)
 
         if agent_direction == LEFT:
@@ -495,9 +497,9 @@ if __name__ == "__main__":
         # print("gameover: " , game.gameOver)
         # print("win: " , game.win)
         # print(game.score)
-        print(game.RLreward)
+        #print(game.RLreward)
         # print(game.pacman.tile)
-        # print(game.maze_map)
+        
         # if game.RLreward == HIT_WALL_PENALITY:
         #     print("*************************************" , game.RLreward)
         #print("*************************************" , game.pacman.tile)
