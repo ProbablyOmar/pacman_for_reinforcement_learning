@@ -78,7 +78,7 @@ GAMEOVERTXT = 4
 
 TIME_PENALITY = -0.5  ### -.01
 RAND_PENALITY = 0    ## this will only be in the safe mode training once ghosts are in disable it
-PELLET_LOST_PENALITY = -0.5
+PELLET_LOST_PENALITY = -10  #in -.05 
 HIT_WALL_PENALITY = -3.5 
 
 PELLET_REWARD_UPDATE = 0.1
@@ -149,6 +149,7 @@ SCARY_2_MODE = 3
 ###
 
 MAX_USELESS_STEPS = 1000   #1000
+MAX_EPISODE_STEPS = 400
 #MAX_USELESS_STEPS = 70
 
 ##steps modes

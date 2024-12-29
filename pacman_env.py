@@ -24,12 +24,13 @@ if "pacman-v0" not in gym.envs.registry:
 class PacmanEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
 
-    def __init__(self, render_mode=None , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = MAZE3):
+    def __init__(self, render_mode=None , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = MAZE3 , pac_pos_mode = RANDOM_PAC_POS):
 
-        self.game = GameController(rlTraining = True , mode = mode , move_mode = move_mode , clock_tick = clock_tick , pacman_lives = pacman_lives , maze_mode=maze_mode)
+        self.game = GameController(rlTraining = True , mode = mode , move_mode = move_mode , clock_tick = clock_tick , pacman_lives = pacman_lives , maze_mode=maze_mode , pac_pos_mode = RANDOM_PAC_POS)
         self.num_pellets_last = 0
         self.game_score = 0
         self.useless_steps = 0
+        self.episode_steps = 0
 
         self.observation_space = spaces.Box(
                     low = 0, high = 13 , shape = (1 , GAME_ROWS , GAME_COLS) , dtype=np.int_
@@ -56,6 +57,7 @@ class PacmanEnv(gym.Env):
         super().reset(seed=seed)
         self.game.restartGame()
         self.game_score = 0
+        self.episode_steps = 0
 
         observation = self._getobs()
         info = {}
@@ -93,15 +95,20 @@ class PacmanEnv(gym.Env):
                     np.copyto(self._last_obs , observation)
                     self.game_score += step_reward
 
-                    if self.game.mode == SAFE_MODE:
-                        if reward == TIME_PENALITY or reward == HIT_WALL_PENALITY:
-                            self.useless_steps +=1
-                            if self.useless_steps >= MAX_USELESS_STEPS:
-                                self.game.done = True
-                                terminated = self.game.done
-                                self.useless_steps = 0
+                    # if self.game.mode == SAFE_MODE:
+                    #     if reward == TIME_PENALITY or reward == HIT_WALL_PENALITY:
+                    #         self.useless_steps +=1
+                    #         if self.useless_steps >= MAX_USELESS_STEPS:
+                    #             self.game.done = True
+                    #             terminated = self.game.done
+                    #             self.useless_steps = 0
                         # else:
                         #     self.useless_steps = 0
+                    self.episode_steps += 1
+                    if self.episode_steps >= MAX_EPISODE_STEPS:
+                        self.game.done = True
+                        terminated = self.game.done
+                        self.episode_steps = 0
                     return observation, step_reward, terminated, truncated, info 
 
 
@@ -132,17 +139,22 @@ class PacmanEnv(gym.Env):
             #np.copyto(self._last_obs , observation)
             self.game_score += reward
 
-            if self.game.mode == SAFE_MODE:
-                if reward == TIME_PENALITY or reward == HIT_WALL_PENALITY:
-                    self.useless_steps +=1
-                    if self.useless_steps >= MAX_USELESS_STEPS:
-                        self.game.done = True
-                        terminated = self.game.done
-                        self.useless_steps = 0
+            # if self.game.mode == SAFE_MODE:
+            #     if reward == TIME_PENALITY or reward == HIT_WALL_PENALITY:
+            #         self.useless_steps +=1
+            #         if self.useless_steps >= MAX_USELESS_STEPS:
+            #             self.game.done = True
+            #             terminated = self.game.done
+            #             self.useless_steps = 0
                 # else:
                 #     self.useless_steps = 0
             # if reward > 0:
             #     print(reward)
+            self.episode_steps += 1
+            if self.episode_steps >= MAX_EPISODE_STEPS:
+                self.game.done = True
+                terminated = self.game.done
+                self.episode_steps = 0
             return observation, reward, terminated, truncated, info
 
 
@@ -155,90 +167,90 @@ class PacmanEnv(gym.Env):
             pygame.event.post(pygame.event.Event(QUIT))
 
 
-if __name__ == "__main__":
-    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = RAND_MAZE , pac_pos_mode=RANDOM_PAC_POS)
-    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1,  maze_mode = RAND_MAZE , pac_pos_mode=RANDOM_PAC_POS)
-    
-    model_path = "./models/dqn_baseline_cnn3_eat_pellets_rand_maze"
-
-    log_path = "./logs/fit"
-   
-    if not os.path.exists(log_path):
-        os.makedirs(log_path)
-
-    if not os.path.exists(model_path):  
-        os.makedirs(model_path) 
-        env = env_not_render
-        obs , _ = env.reset()
-
-        policy_kwargs = dict(
-            features_extractor_class=CustomCNN,
-            features_extractor_kwargs=dict(features_dim=1024),
-        )
-        model = DQN(
-            "CnnPolicy" , 
-            env , 
-            learning_rate  = 0.00005 , 
-            learning_starts  = 2000,
-            batch_size= 32,   #32
-            gamma = 0.97,
-            #train_freq = (1, "episode"),
-            gradient_steps = 4,
-            target_update_interval=150,
-            exploration_fraction=1,
-            exploration_initial_eps=1,
-            exploration_final_eps=0.3,
-
-            policy_kwargs = policy_kwargs , 
-            verbose = 1 , 
-            tensorboard_log = log_path
-        )
-
-        #print("here ***********: " , model.exploration_fraction , model.exploration_initial_eps , model.exploration_final_eps , model.policy)
-        time_steps = 400_000
-        for i in range (100):
-            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/dqn_baseline_cnn3_eat_pellets_rand_maze")
-            model.save(f"{model_path}/{(i+2)*time_steps}") 
-
-    elif os.path.exists(model_path):
-        env = env_render
-        obs , _ = env.reset()
-        model_final_path = f"./{model_path}/1600000.zip"
-        model = DQN.load(model_final_path , env = env)
-
-        episodes = 10
-        for ep in range(episodes):
-            done = False
-            while not done:
-                action , next_state = model.predict(obs)
-                obs, reward, terminated, truncated, info = env.step(int(action))
-                print(env.game_score)
-                done = terminated
-        env.close()
-
-
 # if __name__ == "__main__":
-#     os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-#     env = gym.make("pacman-v0", render_mode="human" , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 1 , maze_mode = RAND_MAZE)
-#     # print("Checking Environment")
-#     # check_env(env.unwrapped)
-#     # print("done checking environment")
+#     env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = RAND_MAZE , pac_pos_mode=RANDOM_PAC_POS)
+#     env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1,  maze_mode = RAND_MAZE , pac_pos_mode=RANDOM_PAC_POS)
+    
+#     model_path = "./models/dqn_baseline_cnn3_eat_pellets_rand_maze"
 
-#     obs = env.reset()[0]
-#     done = False
-#     action = 4
-#     while not done:
-#         randaction = env.action_space.sample()
-#         env.render()
-#         obs, reward, terminated, _, _ = env.step(action)
-#         done = terminated 
-#         print(obs)
-#         #print(reward)
-#         #print(env.game_score)
-#         if action == 1 and reward == HIT_WALL_PENALITY:
-#             action = 2
-#         elif reward == HIT_WALL_PENALITY:
-#             action = 1
+#     log_path = "./logs/fit"
+   
+#     if not os.path.exists(log_path):
+#         os.makedirs(log_path)
+
+#     if not os.path.exists(model_path):  
+#         os.makedirs(model_path) 
+#         env = env_not_render
+#         obs , _ = env.reset()
+
+#         policy_kwargs = dict(
+#             features_extractor_class=CustomCNN,
+#             features_extractor_kwargs=dict(features_dim=1024),
+#         )
+#         model = DQN(
+#             "CnnPolicy" , 
+#             env , 
+#             learning_rate  = 0.00005 , 
+#             learning_starts  = 2000,
+#             batch_size= 32,   #32
+#             gamma = 0.97,
+#             #train_freq = (1, "episode"),
+#             gradient_steps = 4,
+#             target_update_interval=150,
+#             exploration_fraction=1,
+#             exploration_initial_eps=1,
+#             exploration_final_eps=0.3,
+
+#             policy_kwargs = policy_kwargs , 
+#             verbose = 1 , 
+#             tensorboard_log = log_path
+#         )
+
+#         #print("here ***********: " , model.exploration_fraction , model.exploration_initial_eps , model.exploration_final_eps , model.policy)
+#         time_steps = 400_000
+#         for i in range (100):
+#             model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/dqn_baseline_cnn3_eat_pellets_rand_maze")
+#             model.save(f"{model_path}/{(i+2)*time_steps}") 
+
+#     elif os.path.exists(model_path):
+#         env = env_render
+#         obs , _ = env.reset()
+#         model_final_path = f"./{model_path}/1600000.zip"
+#         model = DQN.load(model_final_path , env = env)
+
+#         episodes = 10
+#         for ep in range(episodes):
+#             done = False
+#             while not done:
+#                 action , next_state = model.predict(obs)
+#                 obs, reward, terminated, truncated, info = env.step(int(action))
+#                 print(env.game_score)
+#                 done = terminated
+#         env.close()
+
+
+if __name__ == "__main__":
+    os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+    env = gym.make("pacman-v0", render_mode="human" , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 1 , maze_mode = RAND_MAZE ,pac_pos_mode = RANDOM_PAC_POS)
+    # print("Checking Environment")
+    # check_env(env.unwrapped)
+    # print("done checking environment")
+
+    obs = env.reset()[0]
+    done = False
+    action = 4
+    while not done:
+        randaction = env.action_space.sample()
+        env.render()
+        obs, reward, terminated, _, _ = env.step(action)
+        done = terminated 
+        print(env.episode_steps)
+        #print(reward)
+        #print(env.game_score)
+        if action == 1 and reward == HIT_WALL_PENALITY:
+            action = 2
+        elif reward == HIT_WALL_PENALITY:
+            action = 1
 
 
 
