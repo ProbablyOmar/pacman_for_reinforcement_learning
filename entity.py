@@ -166,13 +166,13 @@ class Entity(object):
 
     def hit_wall (self , maze_map , direction):
         entity_x_tile , entity_y_tile = self.tile
-        if direction == RIGHT and entity_x_tile < GAME_COLS - 1 and maze_map[entity_y_tile][entity_x_tile+1] == WALL_MAZE:
+        if direction == RIGHT and entity_x_tile < GAME_COLS - 1 and maze_map[entity_y_tile][entity_x_tile+1] == 1:
             return True
-        elif direction == LEFT and entity_x_tile > 0 and maze_map[entity_y_tile][entity_x_tile-1] == WALL_MAZE:
+        elif direction == LEFT and entity_x_tile > 0 and maze_map[entity_y_tile][entity_x_tile-1] == 1:
             return True
-        elif direction == UP and entity_y_tile > 0 and maze_map[entity_y_tile - 1][entity_x_tile] == WALL_MAZE:
+        elif direction == UP and entity_y_tile > 0 and maze_map[entity_y_tile - 1][entity_x_tile] == 1:
             return True
-        elif direction == DOWN and entity_y_tile < GAME_ROWS -1 and maze_map[entity_y_tile + 1][entity_x_tile] == WALL_MAZE:
+        elif direction == DOWN and entity_y_tile < GAME_ROWS -1 and maze_map[entity_y_tile + 1][entity_x_tile] == 1:
             return True
         else:
             #print(direction)

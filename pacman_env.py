@@ -1,3 +1,5 @@
+import os
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 import pygame
 from pygame.locals import *
 import gymnasium as gym
@@ -12,7 +14,6 @@ from stable_baselines3 import DQN , PPO
 from modified_tensorboard import TensorboardCallback
 from stable_baselines3.dqn import MultiInputPolicy
 from torch.optim import RMSprop, Adam
-import os
 import copy
 
 GHOST_MODES = {SCATTER: 0, CHASE: 0, FREIGHT: 1, SPAWN: 2}
@@ -34,16 +35,33 @@ class PacmanEnv(gym.Env):
         self.episode_steps = 0
 
         self.num_frames_obs = 4
-        
+        reward_obs = [PELLET_MAZE , PP_MAZE , FRUIT_MAZE , GCC_MAZE , GCF_MAZE , GSC_MAZE , GSF_MAZE]
+
+        low = np.zeros((3, GAME_ROWS, GAME_COLS), dtype=np.int_)
+        high = np.zeros((3, GAME_ROWS, GAME_COLS), dtype=np.int_)
+
+        # First matrix: 0 or 1
+        low[0, :, :] = 0
+        high[0, :, :] = 1
+
+        # Second matrix: 0 or 1
+        low[1, :, :] = 0
+        high[1, :, :] = 1
+
+        # Third matrix: Specific range
+        low[2, :, :] = min(reward_obs)  # Minimum value in the constants
+        high[2, :, :] = max(reward_obs)  # Maximum value in the constants
         self.observation_space = spaces.Box(
-                    low = 0, high = 13 , shape = (self.num_frames_obs , GAME_ROWS , GAME_COLS) , dtype=np.int_
+                    low = low , 
+                    high = high , 
+                    shape = (3 , GAME_ROWS , GAME_COLS) , 
+                    dtype=np.int_
                 )
         
         self.action_space = spaces.Discrete(5, start=0)
 
         self._maze_map = np.zeros(shape=(GAME_ROWS , GAME_COLS), dtype=np.int_)
         self._last_obs = np.zeros(shape=(GAME_ROWS , GAME_COLS), dtype=np.int_)
-        self.observation_buffer = np.zeros(shape=(self.num_frames_obs , GAME_ROWS , GAME_COLS), dtype=np.int_)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -52,7 +70,7 @@ class PacmanEnv(gym.Env):
             self.clock = self.game.clock
 
     def _getobs(self):
-        self._maze_map = self.game.observation
+        self._maze_map = self.game.maze_map
         #self._maze_map = np.expand_dims(self._maze_map , axis=0)
         return self._maze_map
 
@@ -63,11 +81,9 @@ class PacmanEnv(gym.Env):
         self.game_score = 0
 
         observation = self._getobs()
-        for i in range (self.num_frames_obs):
-            self.observation_buffer[i] = observation
         #obs_buf = np.expand_dims(self.observation_buffer , axis=0) 
         info = {}
-        return self.observation_buffer, info
+        return observation, info
 
     def step(self, action):
         if self.game.move_mode == CONT_STEPS_MODE:
@@ -154,8 +170,6 @@ class PacmanEnv(gym.Env):
             # if reward > 0:
             #     print(reward)
 
-            self.observation_buffer[:-1] = self.observation_buffer[1:]
-            self.observation_buffer[-1] = observation
             #obs_buf = np.expand_dims(self.observation_buffer , axis=0)
             # print("***********")
             # print(reward)
@@ -164,7 +178,7 @@ class PacmanEnv(gym.Env):
             self.episode_steps +=1
             if terminated:
                 self.episode_steps = 0
-            return self.observation_buffer, reward, terminated, truncated, info
+            return observation, reward, terminated, truncated, info
 
 
     def render(self):
@@ -177,10 +191,10 @@ class PacmanEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
-    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3,  maze_mode = MAZE1)
+    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 7 , maze_mode = SMALL_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
+    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_1_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 7,  maze_mode = SMALL_MAZE , pac_pos_mode = RANDOM_PAC_POS)
     
-    model_path = "./models/2_ghosts_2"
+    model_path = "./models/2_ghosts_3_ch_obs"
 
     log_path = "./logs/fit"
    
@@ -189,7 +203,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(model_path):  
         os.makedirs(model_path) 
-        env = env_not_render
+        env = env_render
         obs , _ = env.reset()
 
         optimizer_kwargs = dict(
@@ -227,7 +241,7 @@ if __name__ == "__main__":
         #print("here ***********: " , model.exploration_fraction , model.exploration_initial_eps , model.exploration_final_eps , model.policy)
         time_steps = 1000000
         for i in range (50):
-            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/2_ghosts_2")
+            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/2_ghosts_3_ch_obs")
             model.save(f"{model_path}/{(i+1)*time_steps}") 
 
     elif os.path.exists(model_path):
@@ -249,7 +263,7 @@ if __name__ == "__main__":
 
 # if __name__ == "__main__":
 #     os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-#     env = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 1,  maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
+#     env = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3,  maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
 #     # print("Checking Environment")
 #     # check_env(env.unwrapped)
 #     # print("done checking environment")

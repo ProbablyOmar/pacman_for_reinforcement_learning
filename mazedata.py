@@ -42,7 +42,7 @@ class Maze1(MazeBase):
         if self.pac_pos_mode  == NORMAL_PAC_POS:
             self.pacmanStart = (14, 26)    #(14, 26)
         elif self.pac_pos_mode  == RANDOM_PAC_POS:
-            self.pacmanStart = random.choice([(14,26) , (2, 26) , (2, 4) , (26, 4) , ((26, 32))])
+            self.pacmanStart = random.choice([(14,26) , (2, 26) , (2, 4) , (26, 4) , (26, 32)])
 
         self.fruitStart = (9, 20)
         self.ghostNodeDeny = {
@@ -63,7 +63,7 @@ class Maze3(MazeBase):
         if self.pac_pos_mode  == NORMAL_PAC_POS:
             self.pacmanStart = (14, 26)    #(14, 26)
         elif self.pac_pos_mode  == RANDOM_PAC_POS:
-            self.pacmanStart = random.choice([(14,26) , (2, 26) , (2, 4) , (26, 4) , ((26, 32))])
+            self.pacmanStart = random.choice([(14,26) , (2, 26) , (2, 4) , (26, 4) , (26, 32)])
         self.fruitStart = (9, 20)
         self.ghostNodeDeny = {
             UP: ((12, 14), (15, 14), (12, 26), (15, 26)),
@@ -83,7 +83,7 @@ class Maze4(MazeBase):
         if self.pac_pos_mode  == NORMAL_PAC_POS:
             self.pacmanStart = (14, 26)    #(14, 26)
         elif self.pac_pos_mode  == RANDOM_PAC_POS:
-            self.pacmanStart = random.choice([(14,26) , (2, 26) , (2, 4) , (26, 4) , ((26, 32))])
+            self.pacmanStart = random.choice([(14,26) , (2, 26) , (2, 4) , (26, 4) , (26, 32)])
         self.fruitStart = (9, 20)
         self.ghostNodeDeny = {
             UP: ((12, 14), (15, 14), (12, 26), (15, 26)),
@@ -103,7 +103,7 @@ class Maze5(MazeBase):
         if self.pac_pos_mode  == NORMAL_PAC_POS:
             self.pacmanStart = (14, 26)    #(14, 26)
         elif self.pac_pos_mode  == RANDOM_PAC_POS:
-            self.pacmanStart = random.choice([(14,26) , (2, 26) , (2, 4) , (26, 4) , ((26, 32))])
+            self.pacmanStart = random.choice([(14,26) , (2, 26) , (2, 4) , (26, 4) , (26, 32)])
         self.fruitStart = (9, 20)
         self.ghostNodeDeny = {
             UP: ((12, 14), (15, 14), (12, 26), (15, 26)),
@@ -131,6 +131,28 @@ class Maze6(MazeBase):
             RIGHT: (self.addOffset(2, 3),),
         }
 
+class small_maze(MazeBase):
+    def __init__(self , pac_pos_mode):
+        MazeBase.__init__(self)
+        self.pac_pos_mode = pac_pos_mode
+        self.name = "small_maze"
+        self.portalPairs = {0: ((0, 17), (27, 17))}
+        self.homeoffset = (11.5, 14)
+        self.homenodeconnectLeft = (12, 14)     #(12, 14)
+        self.homenodeconnectRight = (14, 14)
+
+        if self.pac_pos_mode  == NORMAL_PAC_POS:
+            self.pacmanStart = (14, 26)    #(14, 26)
+        elif self.pac_pos_mode  == RANDOM_PAC_POS:
+            self.pacmanStart = random.choice([(1,8) , (26,8) , (14, 26)])
+
+        self.fruitStart = (9, 20)
+        self.ghostNodeDeny = {
+            UP: ((12, 14), (15, 14), (12, 26), (15, 26)),
+            LEFT: (self.addOffset(2, 3),),
+            RIGHT: (self.addOffset(2, 3),),
+        }
+
 class Maze2(MazeBase):
     def __init__(self):
         MazeBase.__init__(self)
@@ -151,7 +173,7 @@ class Maze2(MazeBase):
 class MazeData(object):
     def __init__(self):
         self.obj = None
-        self.mazedict = {0: Maze1, 1: Maze2 , 2 : Maze3 , 3: Maze4 , 4:Maze5 , 5:Maze6}
+        self.mazedict = {0: Maze1, 1: Maze2 , 2 : Maze3 , 3: Maze4 , 4:Maze5 , 5:Maze6 , 6: small_maze}
 
     def loadMaze(self, maze_mode , pac_pos_mode):
         if maze_mode == RAND_MAZE:
