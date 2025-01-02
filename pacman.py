@@ -48,7 +48,18 @@ class Pacman(Entity):
         return False
 
     def tile_collideCheck(self, other):
-        if self.tile == other.tile:
+        come_right = False
+        come_left = False
+        come_up = False
+        come_down = False
+
+        if other.name != PELLET and other.name != POWERPELLET:
+            come_right = self.tile[0] - other.tile[0] == -1 and self.tile[1] == other.tile[1] and self.direction == RIGHT and other.direction == LEFT
+            come_left = self.tile[0] - other.tile[0] == 1 and self.tile[1] == other.tile[1] and self.direction == LEFT and other.direction == RIGHT
+            come_up = self.tile[1] - other.tile[1] == 1 and self.tile[0] == other.tile[0] and self.direction == UP and other.direction == DOWN
+            come_down = self.tile[1] - other.tile[1] == -1 and self.tile[0] == other.tile[0] and self.direction == DOWN and other.direction == UP
+
+        if self.tile == other.tile  or come_right or come_left or come_up or come_down:
             return True
         return False
 

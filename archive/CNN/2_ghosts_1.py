@@ -31,7 +31,6 @@ class PacmanEnv(gym.Env):
         self.num_pellets_last = 0
         self.game_score = 0
         self.useless_steps = 0
-        self.episode_steps = 0
 
         self.num_frames_obs = 4
         
@@ -59,7 +58,6 @@ class PacmanEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.game.restartGame()
-        self.game.done = False
         self.game_score = 0
 
         observation = self._getobs()
@@ -110,9 +108,6 @@ class PacmanEnv(gym.Env):
                                 self.useless_steps = 0
                         # else:
                         #     self.useless_steps = 0
-                    self.episode_steps +=1
-                    if terminated:
-                        self.episode_steps = 0
                     return observation, step_reward, terminated, truncated, info 
 
 
@@ -157,13 +152,6 @@ class PacmanEnv(gym.Env):
             self.observation_buffer[:-1] = self.observation_buffer[1:]
             self.observation_buffer[-1] = observation
             #obs_buf = np.expand_dims(self.observation_buffer , axis=0)
-            # print("***********")
-            # print(reward)
-            # print(terminated)
-            # print("episode steps: " , self.episode_steps)
-            self.episode_steps +=1
-            if terminated:
-                self.episode_steps = 0
             return self.observation_buffer, reward, terminated, truncated, info
 
 
@@ -178,9 +166,9 @@ class PacmanEnv(gym.Env):
 
 if __name__ == "__main__":
     env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
-    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3,  maze_mode = MAZE1)
+    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 1,  maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
     
-    model_path = "./models/2_ghosts_2"
+    model_path = "./models/2_ghosts_1"
 
     log_path = "./logs/fit"
    
@@ -198,7 +186,7 @@ if __name__ == "__main__":
         )
 
         policy_kwargs = dict(
-            features_extractor_class=Updated_CustomCNN_2,
+            features_extractor_class=Updated_CustomCNN,
             optimizer_kwargs=optimizer_kwargs,
             features_extractor_kwargs=dict(features_dim=256),
             optimizer_class=Adam,  # Using Adam optimizer here
@@ -214,7 +202,7 @@ if __name__ == "__main__":
             gamma=0.99,
             train_freq=(4, "step"),
             gradient_steps=2,
-            target_update_interval=500,
+            target_update_interval=1000,
             exploration_fraction=0.1,
             exploration_initial_eps=1,
             exploration_final_eps=0.5,
@@ -227,19 +215,19 @@ if __name__ == "__main__":
         #print("here ***********: " , model.exploration_fraction , model.exploration_initial_eps , model.exploration_final_eps , model.policy)
         time_steps = 1000000
         for i in range (50):
-            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/2_ghosts_2")
+            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/2_ghosts_1")
             model.save(f"{model_path}/{(i+1)*time_steps}") 
 
     elif os.path.exists(model_path):
         env = env_render
         obs , _ = env.reset()
-        model_final_path = f"./{model_path}/3000000.zip"
+        model_final_path = f"./{model_path}/250000.zip"
         model = DQN.load(model_final_path , env = env)
 
         episodes = 10
         for ep in range(episodes):
             done = False
-            while not done: 
+            while not done:
                 action , next_state = model.predict(obs)
                 obs, reward, terminated, truncated, info = env.step(int(action))
                 print(env.game_score)

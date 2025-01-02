@@ -16,6 +16,12 @@ import numpy as np
 import time
 import copy
 
+class reward ():
+    def __init__ (self , name , value):
+        self.name = name
+        self.value = value
+
+
 class GameController(object):
     def __init__(self, rlTraining=False , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick = 10 , pacman_lives = 1 , maze_mode = MAZE3 , pac_pos_mode = NORMAL_PAC_POS):
         pygame.init()
@@ -60,9 +66,9 @@ class GameController(object):
 
     def restartGame(self):
         self.pacman.can_eat = True
-        #self.gameOver = False
+        self.gameOver = False
         self.textgroup.hideText()
-        #self.win = False
+        self.win = False
         # self.lives = 5
         self.lives = self.pacman_original_lives
         self.level = 0
@@ -110,6 +116,19 @@ class GameController(object):
 
 
     def startGame(self):
+        ## reward function
+        self.time_penality = reward("time_penlaity" , TIME_PENALITY)
+        self.rand_penality = reward("rand_penality" , RAND_PENALITY)
+        self.pellet_lost_penality = reward("pellet_lost_penality" , PELLET_LOST_PENALITY)
+        self.hit_wall_penality = reward("hit_wall_penality" , HIT_WALL_PENALITY)
+        self.pellet_reward = reward("pellet_reard" , PELLET_REWARD)
+        self.pp_reward = reward ("pp_reward",POWERPELLET_REWARD)
+        self.fruit_reward = reward("fruit_reward",FRUIT_REWARD)
+        self.finish_level_reward = reward("finish_level_reward" , FINISH_LEVEL_REWARD)
+        self.ghost_penality= reward("ghost_penality" , GHOST_PENALITY)
+        self.ghost_reward = reward("ghost_reward" , GHOST_REWARD)
+        ###############
+
         self.pause.paused = False
         self.mazedata.loadMaze(self.maze_mode , self.pac_pos_mode)
         #************************
@@ -182,19 +201,15 @@ class GameController(object):
     #     self.take_step = True
 
     def update(self, agent_direction=None, render=True):
+        # print(agent_direction)
         self.RLreward = 0
+        prev_pac_direction = self.pacman.direction
         #print ("order direction: " , agent_direction , " pacman direction: " , self.pacman.direction)
-        ### check if the pacman is changing directions with no فايدة
-        if self.rlTraining ==True and self.mode == SAFE_MODE:
-            if agent_direction == - self.pacman.direction and agent_direction != STOP:
-                self.updateScore(RAND_PENALITY  )
-        ################################################
-
         
         ### check if the pacman hits a wall
         pac_hit_wall = self.pacman.hit_wall(self.set_maze_map , agent_direction)
         if pac_hit_wall:
-            self.updateScore(HIT_WALL_PENALITY)
+            self.updateScore(self.hit_wall_penality)
         ################################################
         
         dt = self.clock.tick(self.clock_tick) / 1000.0
@@ -222,14 +237,30 @@ class GameController(object):
             self.observation = self.maze_map
             del self.maze_map
 
-        
+        ##this should be before handling terminal state area and after check_pellets_events and check_ghosts_events
         self.done = self.gameOver or self.win
-        ## penalize the leftover pellets
-        
+        ## penalize the leftover pellets 
         if self.done == True:
-            self.updateScore(PELLET_LOST_PENALITY * len(self.pellets.pelletList))
+            self.updateScore(self.pellet_lost_penality)
+
+        ### check if the pacman is changing directions with no فايدة
+        if self.rlTraining ==True and self.mode == SAFE_MODE:
+            if agent_direction == - prev_pac_direction and agent_direction != STOP:
+                self.updateScore(self.rand_penality)
+        ################################################
+        ### check if the pacman finished the level successfully 
+        if self.pellets.isEmpty():
+            self.updateScore(self.finish_level_reward)
+
         if self.RLreward == 0:
-            self.updateScore(TIME_PENALITY)
+            self.updateScore(self.time_penality)
+
+        ## handle terminal states
+        if self.lives <= 0:
+            self.restartGame()
+        if self.pellets.isEmpty():
+            self.nextLevel()
+        #########################
 
         if self.flashBG:
             self.flashTimer += dt
@@ -248,13 +279,15 @@ class GameController(object):
             self.render()
 
 
-    def updateScore(self, points):
-        if self.RLreward == RAND_PENALITY or self.RLreward == PELLET_LOST_PENALITY:
-            self.RLreward += points
+    def updateScore(self, reward):
+        if reward.name == self.rand_penality.name or reward.name == self.finish_level_reward.name:
+            self.RLreward += reward.value
+        elif reward.name == self.pellet_lost_penality.name:
+            self.RLreward += reward.value * len(self.pellets.pelletList)
         else:
-            self.RLreward = points
+            self.RLreward = reward.value
         self.RLreward = round(self.RLreward , 2)
-        self.score += points
+        self.score += self.RLreward
         self.textgroup.updateScore(self.score)
 
     def checkEvents(self):
@@ -345,7 +378,7 @@ class GameController(object):
                     if ghost.can_be_eaten:
                         self.pacman.visible = False
                         ghost.visible = False
-                        self.updateScore(ghost.points)
+                        self.updateScore(self.ghost_reward)
                         self.textgroup.addText(
                             str(ghost.points),
                             WHITE,
@@ -355,6 +388,7 @@ class GameController(object):
                             time=1,
                         )
                         self.ghosts.updatePoints()
+                        self.ghost_reward.value = ghost.points
                         self.pause.setPause(pauseTime=1, func=self.showEntities)
                         ghost.startSpawn()
                         self.nodes.allowHomeAccess(ghost)
@@ -363,16 +397,17 @@ class GameController(object):
                         if self.pacman.alive:
                             self.pacman.can_eat = False
                             self.lives -= 1
-                            self.updateScore(ghost.ghost_penality)
+                            self.updateScore(self.ghost_penality)
                             ## increase the ghost penality each time you lose a life 
                             self.ghosts.update_penality_points()
+                            self.ghost_penality.value = ghost.ghost_penality
                             self.lifesprites.removeImage()
                             self.pacman.die()
                             self.ghosts.hide()
                             if self.lives <= 0:
                                 self.textgroup.showText(GAMEOVERTXT)
                                 self.gameOver = True
-                                self.restartGame()
+                                #self.restartGame()
                             else:
                                 self.resetLevel()
 
@@ -397,9 +432,10 @@ class GameController(object):
             ###
 
             self.pellets.numEaten += 1
-            self.updateScore(pellet.points)
+            self.updateScore(self.pellet_reward)
             ## update pellet points each time you eat a new one
             self.pellets.updatePoints()
+            self.pellet_reward.value = pellet.points
 
             if self.pellets.numEaten == 30:
                 self.ghosts.inky.startNode.allowAccess(RIGHT, self.ghosts.inky)
@@ -410,11 +446,11 @@ class GameController(object):
                 self.ghosts.startFreight()
 
         if self.pellets.isEmpty():
-            self.updateScore(FINISH_LEVEL_REWARD)
-            #self.win = True
+            #self.updateScore(self.finish_level_reward)
+            self.win = True
             self.flashBG = False
             self.hideEntities()
-            self.nextLevel()  ##self.pause.setPause(pauseTime=3, func=self.nextLevel)
+            #self.nextLevel()  ##self.pause.setPause(pauseTime=3, func=self.nextLevel)
 
     def checkFruitEvents(self):
         if self.pellets.numEaten == 50 or self.pellets.numEaten == 140:
@@ -431,7 +467,7 @@ class GameController(object):
             
             if self.pacman.collideCheck(self.fruit):
                 self.set_maze_map[self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
-                self.updateScore(self.fruit.points)
+                self.updateScore(self.fruit_reward)
                 self.textgroup.addText(
                     str(self.fruit.points),
                     WHITE,
@@ -472,13 +508,12 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=2 , maze_mode=MAZE4 , pac_pos_mode=RANDOM_PAC_POS)
+    game = GameController(rlTraining=True , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=10 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
     done = False
     agent_direction=LEFT
 
-
-    while not done:
-        game.update(render=True)
+    while True:
+        game.update(render=True )
         #print(game.observation)
         done = game.done
         #print("direction: ", game.pacman.direction)
@@ -491,11 +526,14 @@ if __name__ == "__main__":
         # print ("done: " , game.done)
         # print("gameover: " , game.gameOver)
         # print("win: " , game.win)
-        #print(game.score)
-        #print(game.RLreward)
+        # print(game.score)
+        # print("*************************************")
+        # print(game.RLreward)
+        # print(game.done)
         # print(game.pacman.tile)
         # print(game.maze_map)
-        #print("*************************************" , game.RLreward)
+        # if game.RLreward == HIT_WALL_PENALITY:
+        #     print("*************************************" , game.RLreward)
         #print("*************************************" , game.pacman.tile)
     # print ("done: " , game.done)
     # print("gameover: " , game.gameOver)

@@ -31,7 +31,6 @@ class PacmanEnv(gym.Env):
         self.num_pellets_last = 0
         self.game_score = 0
         self.useless_steps = 0
-        self.episode_steps = 0
 
         self.num_frames_obs = 4
         
@@ -59,7 +58,6 @@ class PacmanEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.game.restartGame()
-        self.game.done = False
         self.game_score = 0
 
         observation = self._getobs()
@@ -110,9 +108,6 @@ class PacmanEnv(gym.Env):
                                 self.useless_steps = 0
                         # else:
                         #     self.useless_steps = 0
-                    self.episode_steps +=1
-                    if terminated:
-                        self.episode_steps = 0
                     return observation, step_reward, terminated, truncated, info 
 
 
@@ -157,13 +152,6 @@ class PacmanEnv(gym.Env):
             self.observation_buffer[:-1] = self.observation_buffer[1:]
             self.observation_buffer[-1] = observation
             #obs_buf = np.expand_dims(self.observation_buffer , axis=0)
-            # print("***********")
-            # print(reward)
-            # print(terminated)
-            # print("episode steps: " , self.episode_steps)
-            self.episode_steps +=1
-            if terminated:
-                self.episode_steps = 0
             return self.observation_buffer, reward, terminated, truncated, info
 
 
@@ -178,7 +166,7 @@ class PacmanEnv(gym.Env):
 
 if __name__ == "__main__":
     env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
-    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3,  maze_mode = MAZE1)
+    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 3,  maze_mode = MAZE1)
     
     model_path = "./models/2_ghosts_2"
 
@@ -233,7 +221,7 @@ if __name__ == "__main__":
     elif os.path.exists(model_path):
         env = env_render
         obs , _ = env.reset()
-        model_final_path = f"./{model_path}/3000000.zip"
+        model_final_path = f"./{model_path}/2000000.zip"
         model = DQN.load(model_final_path , env = env)
 
         episodes = 10
