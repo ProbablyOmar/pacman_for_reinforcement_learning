@@ -44,7 +44,8 @@ class PelletGroup(object):
         self.pelletList = []
         self.powerpellets = []
         self.numEaten = 0
-        self.init_rewards_map = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)
+        self.init_pellets_map = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)
+        self.init_p_pellets_map = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)
         self.init_walls_map = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)
         self.createPelletList(pelletfile)
 
@@ -64,7 +65,7 @@ class PelletGroup(object):
                     pel = Pellet(row, col)
                     self.pelletList.append(pel)
                     ### put the pellets reward in the maze
-                    self.init_rewards_map[pel.tile[1]][pel.tile[0]] = PELLET_MAZE
+                    self.init_pellets_map[pel.tile[1]][pel.tile[0]] = PELLET_MAZE
                     ###
                 elif data[row][col] in ["P", "p"]:
                     pp = PowerPellet(row, col)
@@ -72,7 +73,7 @@ class PelletGroup(object):
                     self.powerpellets.append(pp)
 
                     ### put the power pellets reward in the maze
-                    self.init_rewards_map[pp.tile[1]][pp.tile[0]] = PP_MAZE
+                    self.init_p_pellets_map[pp.tile[1]][pp.tile[0]] = 1
                     ###
 
                 ## if its a wall in the maze

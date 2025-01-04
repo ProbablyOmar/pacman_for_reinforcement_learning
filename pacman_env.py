@@ -34,11 +34,8 @@ class PacmanEnv(gym.Env):
         self.useless_steps = 0
         self.episode_steps = 0
 
-        self.num_frames_obs = 4
-        reward_obs = [PELLET_MAZE , PP_MAZE , FRUIT_MAZE , GCC_MAZE , GCF_MAZE , GSC_MAZE , GSF_MAZE]
-
-        low = np.zeros((3, GAME_ROWS, GAME_COLS), dtype=np.int_)
-        high = np.zeros((3, GAME_ROWS, GAME_COLS), dtype=np.int_)
+        low = np.zeros((5, GAME_ROWS, GAME_COLS), dtype=np.int_)
+        high = np.zeros((5, GAME_ROWS, GAME_COLS), dtype=np.int_)
 
         # First matrix: 0 or 1
         low[0, :, :] = 0
@@ -46,22 +43,31 @@ class PacmanEnv(gym.Env):
 
         # Second matrix: 0 or 1
         low[1, :, :] = 0
-        high[1, :, :] = 1
+        high[1, :, :] = GHOST_D
 
         # Third matrix: Specific range
-        low[2, :, :] = min(reward_obs)  # Minimum value in the constants
-        high[2, :, :] = max(reward_obs)  # Maximum value in the constants
+        low[2, :, :] = 0  # Minimum value in the constants
+        high[2, :, :] = FRUIT_MAZE  # Maximum value in the constants
+
+        # fourth matrix: Specific range
+        low[3, :, :] = 0  # Minimum value in the constants
+        high[3, :, :] = 1  # Maximum value in the constants
+
+        # fifth matrix: Specific range
+        low[4, :, :] = 0  # Minimum value in the constants
+        high[4, :, :] = GHOST_D  # Maximum value in the constants
+
         self.observation_space = spaces.Box(
                     low = low , 
                     high = high , 
-                    shape = (3 , GAME_ROWS , GAME_COLS) , 
+                    shape = (5 , GAME_ROWS , GAME_COLS) , 
                     dtype=np.int_
                 )
         
-        self.action_space = spaces.Discrete(5, start=0)
+        self.action_space = spaces.Discrete(4, start=0)
 
-        self._maze_map = np.zeros(shape=(GAME_ROWS , GAME_COLS), dtype=np.int_)
-        self._last_obs = np.zeros(shape=(GAME_ROWS , GAME_COLS), dtype=np.int_)
+        self._maze_map = np.zeros(shape=(5, GAME_ROWS , GAME_COLS), dtype=np.int_)
+        self._last_obs = np.zeros(shape=(5, GAME_ROWS , GAME_COLS), dtype=np.int_)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -87,7 +93,15 @@ class PacmanEnv(gym.Env):
 
     def step(self, action):
         if self.game.move_mode == CONT_STEPS_MODE:
-            action -= 2
+            if action == 0:
+                action = RIGHT
+            elif action == 1:
+                action = DOWN
+            elif action == 2:
+                action = UP
+            elif action == 3:
+                action = LEFT
+
             step_reward = TIME_PENALITY
             while True:
                 if self.render_mode == "human":
@@ -133,7 +147,15 @@ class PacmanEnv(gym.Env):
 
 
         elif self.game.move_mode == DISCRETE_STEPS_MODE:
-            action -= 2
+            if action == 0:
+                action = RIGHT
+            elif action == 1:
+                action = DOWN
+            elif action == 2:
+                action = UP
+            elif action == 3:
+                action = LEFT
+
             #step_reward = TIME_PENALITY
             if self.render_mode == "human":
                 self.game.update(
@@ -270,7 +292,7 @@ if __name__ == "__main__":
 
 #     obs = env.reset()[0]
 #     done = False
-#     action = 4
+#     action = 3
 #     num_steps = 1
 #     while not done:
 #         # if num_steps == 10:

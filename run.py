@@ -59,7 +59,7 @@ class GameController(object):
         self.gameOver = False
         self.win = False
         self.done = False
-        self.maze_map = np.zeros((3 , GAME_ROWS , GAME_COLS), dtype=int)
+        self.maze_map = np.zeros((5 , GAME_ROWS , GAME_COLS), dtype=int)
         self.startGame()
 
 
@@ -73,7 +73,7 @@ class GameController(object):
         self.level = 0
         self.pause.paused = False
         if self.fruit:
-            self.init_rewards_map[self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
+            self.maze_map[2][self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
             self.fruit = None
         self.startGame()
         self.score = 0
@@ -89,7 +89,7 @@ class GameController(object):
         self.pacman.reset()
         self.ghosts.reset()
         if self.fruit:
-            self.init_rewards_map[self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
+            self.maze_map[2][self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
             self.fruit = None
         if not (self.rlTraining):
             self.textgroup.showText(READYTXT)
@@ -195,12 +195,14 @@ class GameController(object):
         self.mazedata.obj.denyGhostsAccess(self.ghosts, self.nodes)
 
         self.init_walls_map = self.pellets.init_walls_map
-        self.init_rewards_map = self.pellets.init_rewards_map
+        self.init_pellets_map = self.pellets.init_pellets_map
+        self.init_p_pellets_map = self.pellets.init_p_pellets_map
         #initialize the maze_map
-        self.maze_map[0][self.mazedata.obj.pacmanStart[1] - 3][self.mazedata.obj.pacmanStart[0]] = 1
-        self.maze_map[1] = self.init_walls_map
-        self.maze_map[2] = self.init_rewards_map
-        
+        self.maze_map[0][self.mazedata.obj.pacmanStart[1] - 3][self.mazedata.obj.pacmanStart[0]] = 1  #pacman
+        self.maze_map[1] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)     #scared ghosts
+        self.maze_map[2] = self.init_pellets_map              #pellets
+        self.maze_map[3] = self.init_p_pellets_map            #power pellets
+        self.maze_map[4] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)
 
     # def update_rate (self , update_clock):
     #     self.update_clock.tick(update_clock) / 1000.0
@@ -228,17 +230,20 @@ class GameController(object):
         self.textgroup.update(dt)
         self.pellets.update(dt)
         if not self.pause.paused or self.rlTraining == True:
+            self.maze_map[1] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)   ##reset the chanell of the scared ghosts
+            self.maze_map[4] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)   #reset the chanell of the ghosts ... these two lines should be before check_ghosts_events
+            self.maze_map[0] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)    ##reset the chanell of the pacman
+            self.maze_map[0][self.pacman.tile[1]][self.pacman.tile[0]] = 1
+
             self.ghosts.update(dt)
             if self.fruit is not None:
                 self.fruit.update(dt)
             self.checkPelletEvents()
             self.checkFruitEvents()
             ##update the maze_map with the new pellete and fruit positions
-            self.maze_map[0] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)    ##reset the chanell of the pacman
-            self.maze_map[0][self.pacman.tile[1]][self.pacman.tile[0]] = 1
+            
 
-            self.maze_map[2] = self.init_rewards_map  # this should be after check_pellets events and check_fruit_events and before check_ghosts_events
-            self.checkGhostEvents()
+            self.checkGhostEvents() 
 
 
         ##this should be before handling terminal state area and after check_pellets_events and check_ghosts_events
@@ -312,78 +317,70 @@ class GameController(object):
     def put_ghosts_maze(self , ghost):
         if self.mode == NORMAL_MODE:
             if ghost.mode.current is CHASE or ghost.mode.current is SCATTER:
-                if ghost.direction == RIGHT and self.pacman.tile[0] > ghost.tile[0]:   #if the ghost is moving to the right and the pacman is on the right side
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCC_MAZE
-                elif ghost.direction == LEFT and self.pacman.tile[0] < ghost.tile[0]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCC_MAZE
-                elif ghost.direction == UP and self.pacman.tile[1] < ghost.tile[1]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCC_MAZE
-                elif ghost.direction == DOWN and self.pacman.tile[1] > ghost.tile[1]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCC_MAZE
-                else:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCF_MAZE
+                if ghost.direction == RIGHT:   #if the ghost is moving to the right and the pacman is on the right side
+                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_R
+                elif ghost.direction == LEFT :
+                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_L
+                elif ghost.direction == UP :
+                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_U
+                elif ghost.direction == DOWN :
+                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_D
+
 
             elif ghost.mode.current is FREIGHT:
-                if ghost.direction == RIGHT and self.pacman.tile[0] > ghost.tile[0]:   
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSC_MAZE
-                elif ghost.direction == LEFT and self.pacman.tile[0] < ghost.tile[0]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSC_MAZE
-                elif ghost.direction == UP and self.pacman.tile[1] < ghost.tile[1]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSC_MAZE
-                elif ghost.direction == DOWN and self.pacman.tile[1] > ghost.tile[1]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSC_MAZE
-                else:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSF_MAZE
+                if ghost.direction == RIGHT:  
+                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_R
+                elif ghost.direction == LEFT: 
+                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_L
+                elif ghost.direction == UP:
+                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_U
+                elif ghost.direction == DOWN:
+                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_D
+
 
         elif self.mode == SCARY_1_MODE and ghost.name == BLINKY:
             if ghost.mode.current is CHASE or ghost.mode.current is SCATTER:
-                if ghost.direction == RIGHT and self.pacman.tile[0] > ghost.tile[0]:   #if the ghost is moving to the right and the pacman is on the right side
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCC_MAZE
-                elif ghost.direction == LEFT and self.pacman.tile[0] < ghost.tile[0]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCC_MAZE
-                elif ghost.direction == UP and self.pacman.tile[1] < ghost.tile[1]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCC_MAZE
-                elif ghost.direction == DOWN and self.pacman.tile[1] > ghost.tile[1]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCC_MAZE
-                else:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCF_MAZE
+                if ghost.direction == RIGHT:   #if the ghost is moving to the right and the pacman is on the right side
+                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_R
+                elif ghost.direction == LEFT :
+                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_L
+                elif ghost.direction == UP :
+                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_U
+                elif ghost.direction == DOWN :
+                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_D
+
 
             elif ghost.mode.current is FREIGHT:
-                if ghost.direction == RIGHT and self.pacman.tile[0] > ghost.tile[0]:  
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSC_MAZE
-                elif ghost.direction == LEFT and self.pacman.tile[0] < ghost.tile[0]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSC_MAZE
-                elif ghost.direction == UP and self.pacman.tile[1] < ghost.tile[1]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSC_MAZE
-                elif ghost.direction == DOWN and self.pacman.tile[1] > ghost.tile[1]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSC_MAZE
-                else:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSF_MAZE
+                if ghost.direction == RIGHT:  
+                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_R
+                elif ghost.direction == LEFT: 
+                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_L
+                elif ghost.direction == UP:
+                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_U
+                elif ghost.direction == DOWN:
+                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_D
 
         if self.mode == SCARY_2_MODE and (ghost.name == BLINKY or ghost.name == PINKY):
             if ghost.mode.current is CHASE or ghost.mode.current is SCATTER:
-                if ghost.direction == RIGHT and self.pacman.tile[0] > ghost.tile[0]:   #if the ghost is moving to the right and the pacman is on the right side
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCC_MAZE
-                elif ghost.direction == LEFT and self.pacman.tile[0] < ghost.tile[0]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCC_MAZE
-                elif ghost.direction == UP and self.pacman.tile[1] < ghost.tile[1]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCC_MAZE
-                elif ghost.direction == DOWN and self.pacman.tile[1] > ghost.tile[1]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCC_MAZE
-                else:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GCF_MAZE
+                if ghost.direction == RIGHT:   #if the ghost is moving to the right and the pacman is on the right side
+                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_R
+                elif ghost.direction == LEFT :
+                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_L
+                elif ghost.direction == UP :
+                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_U
+                elif ghost.direction == DOWN :
+                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_D
+
 
             elif ghost.mode.current is FREIGHT:
-                if ghost.direction == RIGHT and self.pacman.tile[0] > ghost.tile[0]:   
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSC_MAZE
-                elif ghost.direction == LEFT and self.pacman.tile[0] < ghost.tile[0]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSC_MAZE
-                elif ghost.direction == UP and self.pacman.tile[1] < ghost.tile[1]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSC_MAZE
-                elif ghost.direction == DOWN and self.pacman.tile[1] > ghost.tile[1]:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSC_MAZE
-                else:
-                    self.maze_map[2][ghost.tile[1]][ghost.tile[0]] = GSF_MAZE
+                if ghost.direction == RIGHT:  
+                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_R
+                elif ghost.direction == LEFT: 
+                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_L
+                elif ghost.direction == UP:
+                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_U
+                elif ghost.direction == DOWN:
+                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_D
         
     def checkGhostEvents(self):
         for ghost in self.ghosts:      
@@ -442,9 +439,9 @@ class GameController(object):
             #print(f"Pellet Eaten at: {pellet.tile}, Reward: {pellet.points}")
             ###update the pellet when eaten and delete the pellet rewards from it 
             if pellet.name == PELLET:
-                self.init_rewards_map[pellet.tile[1]][pellet.tile[0]] -= PELLET_MAZE
+                self.maze_map[2][pellet.tile[1]][pellet.tile[0]] -= PELLET_MAZE
             elif pellet.name == POWERPELLET:
-                self.init_rewards_map[pellet.tile[1]][pellet.tile[0]] -= PP_MAZE
+                self.maze_map[3][pellet.tile[1]][pellet.tile[0]] -= 1
             ###
 
             self.pellets.numEaten += 1
@@ -473,16 +470,16 @@ class GameController(object):
             if self.fruit is None:
                 self.fruit = Fruit(self.nodes.getNodeFromTiles(13, 20), self.level)
                 #### update the maze map with the fruit reward 
-                self.init_rewards_map[self.fruit.tile[1]][self.fruit.tile[0]] = FRUIT_MAZE
+                self.maze_map[2][self.fruit.tile[1]][self.fruit.tile[0]] = FRUIT_MAZE
                 ###
 
         if self.fruit is not None:
             #### update the maze map with the fruit reward 
-            self.init_rewards_map[self.fruit.tile[1]][self.fruit.tile[0]] = FRUIT_MAZE
+            self.maze_map[2][self.fruit.tile[1]][self.fruit.tile[0]] = FRUIT_MAZE
             ###
             
             if self.pacman.collideCheck(self.fruit):
-                self.init_rewards_map[self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
+                self.maze_map[2][self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
                 self.updateScore(self.fruit_reward)
                 self.textgroup.addText(
                     str(self.fruit.points),
@@ -501,7 +498,7 @@ class GameController(object):
                     self.fruitcaptured.append(self.fruit.image)
                 self.fruit = None
             elif self.fruit.destroy:
-                self.init_rewards_map[self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
+                self.maze_map[2][self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
                 self.fruit = None
             
 
@@ -532,7 +529,7 @@ if __name__ == "__main__":
     agent_direction=LEFT
 
     while True:
-        #print(game.maze_map[2])
+        print(game.maze_map[4])
         game.update(render=True )
         #print(game.observation)
         done = game.done
