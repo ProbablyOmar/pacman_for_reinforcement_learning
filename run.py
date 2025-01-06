@@ -59,7 +59,11 @@ class GameController(object):
         self.gameOver = False
         self.win = False
         self.done = False
-        self.maze_map = np.zeros((5 , GAME_ROWS , GAME_COLS), dtype=int)
+
+        self.size_of_obs = GAME_ROWS + GAME_COLS + (3*4) + (4*4) + 2 + 3
+        self.observation = np.zeros((self.size_of_obs), dtype=int)
+        self.dict_obs = {}
+
         self.startGame()
 
 
@@ -73,7 +77,9 @@ class GameController(object):
         self.level = 0
         self.pause.paused = False
         if self.fruit:
-            self.maze_map[2][self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
+            self.dict_obs["fruit_row"] = 0
+            self.dict_obs["fruit_col"] = 0
+            self.dict_obs["fruit_exist"] = 0
             self.fruit = None
         self.startGame()
         self.score = 0
@@ -89,7 +95,9 @@ class GameController(object):
         self.pacman.reset()
         self.ghosts.reset()
         if self.fruit:
-            self.maze_map[2][self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
+            self.dict_obs["fruit_row"] = 0
+            self.dict_obs["fruit_col"] = 0
+            self.dict_obs["fruit_exist"] = 0
             self.fruit = None
         if not (self.rlTraining):
             self.textgroup.showText(READYTXT)
@@ -131,7 +139,6 @@ class GameController(object):
         self.ghost_penality= reward("ghost_penality" , GHOST_PENALITY)
         self.ghost_reward = reward("ghost_reward" , GHOST_REWARD)
         ###############
-
         self.pause.paused = False
         self.mazedata.loadMaze(self.maze_mode , self.pac_pos_mode)
         #************************
@@ -194,15 +201,45 @@ class GameController(object):
         self.ghosts.clyde.startNode.denyAccess(LEFT, self.ghosts.clyde)
         self.mazedata.obj.denyGhostsAccess(self.ghosts, self.nodes)
 
+        self.pellets_rows = self.pellets.pellets_rows
+        self.pellets_cols = self.pellets.pellets_cols
+        self.pp = self.pellets.pp
         self.init_walls_map = self.pellets.init_walls_map
-        self.init_pellets_map = self.pellets.init_pellets_map
-        self.init_p_pellets_map = self.pellets.init_p_pellets_map
-        #initialize the maze_map
-        self.maze_map[0][self.mazedata.obj.pacmanStart[1] - 3][self.mazedata.obj.pacmanStart[0]] = 1  #pacman
-        self.maze_map[1] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)     #scared ghosts
-        self.maze_map[2] = self.init_pellets_map              #pellets
-        self.maze_map[3] = self.init_p_pellets_map            #power pellets
-        self.maze_map[4] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)
+        #initialize the observation
+        ###initialize pellets
+        for row in range (GAME_ROWS):
+            self.dict_obs[f"row{row}"] = self.pellets_rows[row]
+        for col in range (GAME_COLS):
+            self.dict_obs[f"col{col}"] = self.pellets_cols[col]
+
+        ###initialize power pellets
+        pp_idx = 0
+        for pp in range (0 , len(self.pellets.powerpellets)*3 , 3):
+            self.dict_obs[f"pp{pp_idx}row"] = self.pp[pp]
+            self.dict_obs[f"pp{pp_idx}col"] = self.pp[pp+1]
+            self.dict_obs[f"pp{pp_idx}exist"] = self.pp[pp+2]
+            pp_idx += 1
+
+        ### initialize the values of the ghosts
+        for i in range (NUMGHOSTS):
+            self.dict_obs [f"ghost{i}row"] = 0
+            self.dict_obs [f"ghost{i}col"] = 0
+            self.dict_obs [f"ghost{i}dir"] = 0
+            self.dict_obs [f"ghost{i}mode"] = CHASE_OBS
+
+        ### initialize the values of the pacman
+        # self.dict_obs["pacman_row"] = self.pacman.tile[1]
+        # self.dict_obs["pacman_col"] = self.pacman.tile[0]
+        self.dict_obs["pacman_row"] = self.mazedata.obj.pacmanStart[1] - 3
+        self.dict_obs["pacman_col"] = self.mazedata.obj.pacmanStart[0]
+        ### initialize the values of the fruit
+        self.dict_obs["fruit_row"] = 0
+        self.dict_obs["fruit_col"] = 0
+        self.dict_obs["fruit_exist"] = 0
+
+        values = self.dict_obs.values()
+        obs_list = list(values)
+        self.observation = np.array(obs_list)
 
     # def update_rate (self , update_clock):
     #     self.update_clock.tick(update_clock) / 1000.0
@@ -227,24 +264,24 @@ class GameController(object):
         else:
             self.pacman.update(dt, agent_direction)
 
+        self.dict_obs["pacman_row"] = self.pacman.tile[1]
+        self.dict_obs["pacman_col"] = self.pacman.tile[0]   # these two should be after calling pacman update
+
         self.textgroup.update(dt)
         self.pellets.update(dt)
         if not self.pause.paused or self.rlTraining == True:
-            self.maze_map[1] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)   ##reset the chanell of the scared ghosts
-            self.maze_map[4] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)   #reset the chanell of the ghosts ... these two lines should be before check_ghosts_events
-            self.maze_map[0] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)    ##reset the chanell of the pacman
-            self.maze_map[0][self.pacman.tile[1]][self.pacman.tile[0]] = 1
-
             self.ghosts.update(dt)
             if self.fruit is not None:
                 self.fruit.update(dt)
             self.checkPelletEvents()
             self.checkFruitEvents()
             ##update the maze_map with the new pellete and fruit positions
-            
-
             self.checkGhostEvents() 
 
+        ## now self.dict_obs is ready e can move its values to the observation
+        values = self.dict_obs.values()
+        obs_list = list(values)
+        self.observation = np.array(obs_list)
 
         ##this should be before handling terminal state area and after check_pellets_events and check_ghosts_events
         self.done = self.gameOver or self.win
@@ -263,7 +300,7 @@ class GameController(object):
 
         if self.RLreward == 0:
             self.updateScore(self.time_penality)
-        ## now maxe map and reward are ready you can handle terminal states
+        ## now observation and reward are ready you can handle terminal states
         ## handle terminal states
         if self.lives <= 0:
             self.restartGame()
@@ -314,77 +351,68 @@ class GameController(object):
                             self.textgroup.showText(PAUSETXT)
                             self.hideEntities()
 
-    def put_ghosts_maze(self , ghost):
+
+    def put_ghosts_obs(self , ghost , i):
         if self.mode == NORMAL_MODE:
             if ghost.mode.current is CHASE or ghost.mode.current is SCATTER:
-                if ghost.direction == RIGHT:   #if the ghost is moving to the right and the pacman is on the right side
-                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_R
-                elif ghost.direction == LEFT :
-                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_L
-                elif ghost.direction == UP :
-                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_U
-                elif ghost.direction == DOWN :
-                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_D
-
+                self.dict_obs [f"ghost{i}row"] = ghost.tile[1]
+                self.dict_obs [f"ghost{i}col"] = ghost.tile[0]
+                self.dict_obs [f"ghost{i}dir"] = ghost.direction
+                self.dict_obs [f"ghost{i}mode"] = CHASE_OBS
 
             elif ghost.mode.current is FREIGHT:
-                if ghost.direction == RIGHT:  
-                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_R
-                elif ghost.direction == LEFT: 
-                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_L
-                elif ghost.direction == UP:
-                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_U
-                elif ghost.direction == DOWN:
-                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_D
-
+                self.dict_obs [f"ghost{i}row"] = ghost.tile[1]
+                self.dict_obs [f"ghost{i}col"] = ghost.tile[0]
+                self.dict_obs [f"ghost{i}dir"] = ghost.direction
+                self.dict_obs [f"ghost{i}mode"] = FREIGHT_OBS
+            
+            elif ghost.mode.current is SPAWN:  #if the ghost is in mode spawn
+                self.dict_obs [f"ghost{i}row"] = 0
+                self.dict_obs [f"ghost{i}col"] = 0
+                self.dict_obs [f"ghost{i}dir"] = 0
+                self.dict_obs [f"ghost{i}mode"] = CHASE_OBS
 
         elif self.mode == SCARY_1_MODE and ghost.name == BLINKY:
             if ghost.mode.current is CHASE or ghost.mode.current is SCATTER:
-                if ghost.direction == RIGHT:   #if the ghost is moving to the right and the pacman is on the right side
-                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_R
-                elif ghost.direction == LEFT :
-                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_L
-                elif ghost.direction == UP :
-                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_U
-                elif ghost.direction == DOWN :
-                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_D
-
+                self.dict_obs [f"ghost{i}row"] = ghost.tile[1]
+                self.dict_obs [f"ghost{i}col"] = ghost.tile[0]
+                self.dict_obs [f"ghost{i}dir"] = ghost.direction
+                self.dict_obs [f"ghost{i}mode"] = CHASE_OBS
 
             elif ghost.mode.current is FREIGHT:
-                if ghost.direction == RIGHT:  
-                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_R
-                elif ghost.direction == LEFT: 
-                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_L
-                elif ghost.direction == UP:
-                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_U
-                elif ghost.direction == DOWN:
-                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_D
+                self.dict_obs [f"ghost{i}row"] = ghost.tile[1]
+                self.dict_obs [f"ghost{i}col"] = ghost.tile[0]
+                self.dict_obs [f"ghost{i}dir"] = ghost.direction
+                self.dict_obs [f"ghost{i}mode"] = FREIGHT_OBS
+
+            elif ghost.mode.current is SPAWN:  #if the ghost is in mode spawn
+                self.dict_obs [f"ghost{i}row"] = 0
+                self.dict_obs [f"ghost{i}col"] = 0
+                self.dict_obs [f"ghost{i}dir"] = 0
+                self.dict_obs [f"ghost{i}mode"] = CHASE_OBS
 
         if self.mode == SCARY_2_MODE and (ghost.name == BLINKY or ghost.name == PINKY):
             if ghost.mode.current is CHASE or ghost.mode.current is SCATTER:
-                if ghost.direction == RIGHT:   #if the ghost is moving to the right and the pacman is on the right side
-                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_R
-                elif ghost.direction == LEFT :
-                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_L
-                elif ghost.direction == UP :
-                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_U
-                elif ghost.direction == DOWN :
-                    self.maze_map[4][ghost.tile[1]][ghost.tile[0]] = GHOST_D
-
+                self.dict_obs [f"ghost{i}row"] = ghost.tile[1]
+                self.dict_obs [f"ghost{i}col"] = ghost.tile[0]
+                self.dict_obs [f"ghost{i}dir"] = ghost.direction
+                self.dict_obs [f"ghost{i}mode"] = CHASE_OBS
 
             elif ghost.mode.current is FREIGHT:
-                if ghost.direction == RIGHT:  
-                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_R
-                elif ghost.direction == LEFT: 
-                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_L
-                elif ghost.direction == UP:
-                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_U
-                elif ghost.direction == DOWN:
-                    self.maze_map[1][ghost.tile[1]][ghost.tile[0]] = GHOST_D
+                self.dict_obs [f"ghost{i}row"] = ghost.tile[1]
+                self.dict_obs [f"ghost{i}col"] = ghost.tile[0]
+                self.dict_obs [f"ghost{i}dir"] = ghost.direction
+                self.dict_obs [f"ghost{i}mode"] = FREIGHT_OBS
+
+            elif ghost.mode.current is SPAWN:  #if the ghost is in mode spawn
+                self.dict_obs [f"ghost{i}row"] = 0
+                self.dict_obs [f"ghost{i}col"] = 0
+                self.dict_obs [f"ghost{i}dir"] = 0
+                self.dict_obs [f"ghost{i}mode"] = CHASE_OBS
         
     def checkGhostEvents(self):
-        for ghost in self.ghosts:      
-            self.put_ghosts_maze(ghost)
+        for idx , ghost in enumerate(self.ghosts):      
+            self.put_ghosts_obs(ghost , idx)
 
             if self.pacman.collideGhost(ghost):
                 if ghost.mode.current is FREIGHT:
@@ -432,6 +460,7 @@ class GameController(object):
         self.pacman.visible = False
         self.ghosts.hide()
 
+
     def checkPelletEvents(self):
         pellet = self.pacman.eatPellets(self.pellets.pelletList)
         #print(f"Pac-Man Position: {self.pacman.tile}")
@@ -439,9 +468,15 @@ class GameController(object):
             #print(f"Pellet Eaten at: {pellet.tile}, Reward: {pellet.points}")
             ###update the pellet when eaten and delete the pellet rewards from it 
             if pellet.name == PELLET:
-                self.maze_map[2][pellet.tile[1]][pellet.tile[0]] -= PELLET_MAZE
+                self.dict_obs[f"row{pellet.tile[1]}"] -= 1    #a pellet is eaten from this row
+                self.dict_obs[f"col{pellet.tile[0]}"] -= 1    #a pellet is eaten from this column
+
             elif pellet.name == POWERPELLET:
-                self.maze_map[3][pellet.tile[1]][pellet.tile[0]] -= 1
+                pp_row = pellet.tile[1]
+                pp_col = pellet.tile[0]
+                for pp in range (len(self.pellets.powerpellets)):
+                    if self.dict_obs[f"pp{pp}row"] == pp_row and self.dict_obs[f"pp{pp}col"] == pp_col:
+                        self.dict_obs[f"pp{pp}exist"] = 0   ## eat the power pellet
             ###
 
             self.pellets.numEaten += 1
@@ -465,21 +500,35 @@ class GameController(object):
             self.hideEntities()
             #self.nextLevel()  ##self.pause.setPause(pauseTime=3, func=self.nextLevel)
 
+
+### initialize the values of the fruit
+        self.dict_obs["fruit_row"] = 0
+        self.dict_obs["fruit_col"] = 0
+        self.dict_obs["fruit_exist"] = 0
+
     def checkFruitEvents(self):
         if self.pellets.numEaten == 50 or self.pellets.numEaten == 140:
             if self.fruit is None:
                 self.fruit = Fruit(self.nodes.getNodeFromTiles(13, 20), self.level)
-                #### update the maze map with the fruit reward 
-                self.maze_map[2][self.fruit.tile[1]][self.fruit.tile[0]] = FRUIT_MAZE
+                #### update the observation with the fruit positions
+                self.dict_obs["fruit_row"] = self.fruit.tile[1]
+                self.dict_obs["fruit_col"] = self.fruit.tile[0]
+                self.dict_obs["fruit_exist"] = 1
                 ###
 
         if self.fruit is not None:
-            #### update the maze map with the fruit reward 
-            self.maze_map[2][self.fruit.tile[1]][self.fruit.tile[0]] = FRUIT_MAZE
+            #### update the observation with the fruit positions 
+            self.dict_obs["fruit_row"] = self.fruit.tile[1]
+            self.dict_obs["fruit_col"] = self.fruit.tile[0]
+            self.dict_obs["fruit_exist"] = 1
             ###
             
             if self.pacman.collideCheck(self.fruit):
-                self.maze_map[2][self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
+                #### update the observation with the fruit positions
+                self.dict_obs["fruit_row"] = 0
+                self.dict_obs["fruit_col"] = 0
+                self.dict_obs["fruit_exist"] = 0
+
                 self.updateScore(self.fruit_reward)
                 self.textgroup.addText(
                     str(self.fruit.points),
@@ -497,8 +546,11 @@ class GameController(object):
                 if not fruitcaptured:
                     self.fruitcaptured.append(self.fruit.image)
                 self.fruit = None
+            #### update the observation with the fruit positions
             elif self.fruit.destroy:
-                self.maze_map[2][self.fruit.tile[1]][self.fruit.tile[0]] -= FRUIT_MAZE
+                self.dict_obs["fruit_row"] = 0
+                self.dict_obs["fruit_col"] = 0
+                self.dict_obs["fruit_exist"] = 0
                 self.fruit = None
             
 
@@ -524,15 +576,15 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=10 , maze_mode=RAND_MAZE, pac_pos_mode=RANDOM_PAC_POS)
+    game = GameController(rlTraining=True , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=MAZE1, pac_pos_mode=RANDOM_PAC_POS)
     done = False
     agent_direction=LEFT
 
     while True:
-        print(game.maze_map[4])
         game.update(render=True )
-        #print(game.observation)
+        print(game.dict_obs)
         done = game.done
+        print(done , "***************************************************************")
         #print("direction: ", game.pacman.direction)
 
         if agent_direction == LEFT:

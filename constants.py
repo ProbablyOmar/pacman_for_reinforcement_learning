@@ -122,13 +122,9 @@ GHOST_REWARDS = {GHOST_PENALITY : 1 , GHOST_REWARD : 2 , GHOST_REWARD+GHOST_UPDA
 #GHOST_REWARDS = {-50 : 1 , 200 : 2 , 400 : 3 , 800 : 4 , 1600 : 5}
 #
 
-## maze map encodings
-PELLET_MAZE = 1
-FRUIT_MAZE = 3
-GHOST_R = 1
-GHOST_L = 2
-GHOST_U = 3
-GHOST_D = 4
+## observation encodings
+CHASE_OBS = 0
+FREIGHT_OBS = 1
 
 
 ### game mode

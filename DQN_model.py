@@ -408,3 +408,30 @@ class Updated_CustomCNN_2(BaseFeaturesExtractor):
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.linear(self.cnn(observations))
+
+
+class ANN (BaseFeaturesExtractor):
+    """
+    Custom ANN Feature Extractor.
+    :param observation_space: (gym.Space) The observation space of the environment.
+    :param features_dim: (int) Number of features extracted.
+        This corresponds to the number of units for the last layer.
+    """
+
+    def __init__(self, observation_space: spaces.Box, features_dim: int = 256):
+        super().__init__(observation_space, features_dim)
+
+        # Flatten observation space
+        input_dim = observation_space.shape[0]
+
+        self.ann = nn.Sequential(
+            nn.Linear(input_dim, 128),  # First hidden layer with 128 units
+            nn.ReLU(),
+            nn.Linear(128, 64),        # Second hidden layer with 64 units
+            nn.ReLU(),
+            nn.Linear(64, features_dim),  # Output layer with `features_dim` units
+            nn.ReLU()
+        )
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        return self.ann(observations)

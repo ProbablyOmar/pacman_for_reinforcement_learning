@@ -16,8 +16,6 @@ from stable_baselines3.dqn import MultiInputPolicy
 from torch.optim import RMSprop, Adam
 import copy
 
-GHOST_MODES = {SCATTER: 0, CHASE: 0, FREIGHT: 1, SPAWN: 2}
-
 
 if "pacman-v0" not in gym.envs.registry:
     register(id="pacman-v0", entry_point="pacman_env:PacmanEnv", max_episode_steps=1000)
@@ -34,40 +32,107 @@ class PacmanEnv(gym.Env):
         self.useless_steps = 0
         self.episode_steps = 0
 
-        low = np.zeros((5, GAME_ROWS, GAME_COLS), dtype=np.int_)
-        high = np.zeros((5, GAME_ROWS, GAME_COLS), dtype=np.int_)
+        low = np.zeros((self.game.size_of_obs), dtype=np.int_)
+        high = np.zeros((self.game.size_of_obs), dtype=np.int_)
 
-        # First matrix: 0 or 1
-        low[0, :, :] = 0
-        high[0, :, :] = 1
+        #num of pellets
+        low [:31] = 0
+        high [:31] = GAME_COLS - 2   #low and high of the #pellets in the row
+        low[31:59] = 0
+        high[31:59] = GAME_ROWS - 2  #low and high values of the # pellets in each column
+        ## low and high for each power pellet
+        ###pp 1 
+        low[59] = 0
+        high[59] = GAME_ROWS - 1
+        low[60] = 0
+        high[60] = GAME_COLS - 1
+        low[61] = 0
+        high[61] = 1
+        ###pp 2
+        low[62] = 0
+        high[62] = GAME_ROWS - 1
+        low[63] = 0
+        high[63] = GAME_COLS - 1
+        low[64] = 0
+        high[64] = 1
+        ###pp 3
+        low[65] = 0
+        high[65] = GAME_ROWS - 1
+        low[66] = 0
+        high[66] = GAME_COLS - 1
+        low[67] = 0
+        high[67] = 1
+        ###pp 4
+        low[68] = 0
+        high[68] = GAME_ROWS - 1
+        low[69] = 0
+        high[69] = GAME_COLS - 1
+        low[70] = 0
+        high[70] = 1
 
-        # Second matrix: 0 or 1
-        low[1, :, :] = 0
-        high[1, :, :] = GHOST_D
+        ## ghosts 
+        #ghost 1
+        low[71] = 0
+        high[71] = GAME_ROWS - 1
+        low[72] = 0
+        high[72] = GAME_COLS - 1
+        low [73] = -2
+        high [73] = 2
+        low[74] = 0
+        high[74] = 1
+        #ghost 2
+        low[75] = 0
+        high[75] = GAME_ROWS - 1
+        low[76] = 0
+        high[76] = GAME_COLS - 1
+        low [77] = -2
+        high [77] = 2
+        low[78] = 0
+        high[78] = 1
+        #ghost 3
+        low[79] = 0
+        high[79] = GAME_ROWS - 1
+        low[80] = 0
+        high[80] = GAME_COLS - 1
+        low [81] = -2
+        high [81] = 2
+        low[82] = 0
+        high[82] = 1
+        #ghost 4
+        low[83] = 0
+        high[83] = GAME_ROWS - 1
+        low[84] = 0
+        high[84] = GAME_COLS - 1
+        low [85] = -2
+        high [85] = 2
+        low[86] = 0
+        high[86] = 1
 
-        # Third matrix: Specific range
-        low[2, :, :] = 0  # Minimum value in the constants
-        high[2, :, :] = FRUIT_MAZE  # Maximum value in the constants
+        ##pacman positions
+        low[87] = 0
+        high[87] = GAME_ROWS - 1
+        low[88] = 0
+        high[88] = GAME_COLS - 1
 
-        # fourth matrix: Specific range
-        low[3, :, :] = 0  # Minimum value in the constants
-        high[3, :, :] = 1  # Maximum value in the constants
-
-        # fifth matrix: Specific range
-        low[4, :, :] = 0  # Minimum value in the constants
-        high[4, :, :] = GHOST_D  # Maximum value in the constants
+        ##fruit positions
+        low[89] = 0
+        high[89] = GAME_ROWS - 1
+        low[90] = 0
+        high[90] = GAME_COLS - 1
+        low [91] = 0
+        high [91] = 1
 
         self.observation_space = spaces.Box(
                     low = low , 
                     high = high , 
-                    shape = (5 , GAME_ROWS , GAME_COLS) , 
+                    shape = (self.game.size_of_obs ,) , 
                     dtype=np.int_
                 )
         
         self.action_space = spaces.Discrete(4, start=0)
 
-        self._maze_map = np.zeros(shape=(5, GAME_ROWS , GAME_COLS), dtype=np.int_)
-        self._last_obs = np.zeros(shape=(5, GAME_ROWS , GAME_COLS), dtype=np.int_)
+        self.observation = np.zeros(shape=(self.game.size_of_obs), dtype=np.int_)
+        self._last_obs = np.zeros(shape=(self.game.size_of_obs), dtype=np.int_)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -76,9 +141,9 @@ class PacmanEnv(gym.Env):
             self.clock = self.game.clock
 
     def _getobs(self):
-        self._maze_map = self.game.maze_map
+        self.observation = self.game.observation
         #self._maze_map = np.expand_dims(self._maze_map , axis=0)
-        return self._maze_map
+        return self.observation
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -214,7 +279,7 @@ class PacmanEnv(gym.Env):
 
 if __name__ == "__main__":
     env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 7 , maze_mode = SMALL_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
-    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_1_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 7,  maze_mode = SMALL_MAZE , pac_pos_mode = RANDOM_PAC_POS)
+    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_1_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 7,  maze_mode = MAZE1 , pac_pos_mode = RANDOM_PAC_POS)
     
     model_path = "./models/2_ghosts_3_ch_obs"
 
@@ -234,14 +299,14 @@ if __name__ == "__main__":
         )
 
         policy_kwargs = dict(
-            features_extractor_class=Updated_CustomCNN_2,
+            features_extractor_class= ANN ,
             optimizer_kwargs=optimizer_kwargs,
             features_extractor_kwargs=dict(features_dim=256),
             optimizer_class=Adam,  # Using Adam optimizer here
         )
 
         model = DQN(
-            "CnnPolicy",
+            "MlpPolicy",
             env,
             learning_rate=0.00025,
             buffer_size=10_000,
@@ -259,6 +324,7 @@ if __name__ == "__main__":
             tensorboard_log=log_path,
             device='cuda',
         )
+        #print(model.policy)
 
         #print("here ***********: " , model.exploration_fraction , model.exploration_initial_eps , model.exploration_final_eps , model.policy)
         time_steps = 1000000
@@ -285,10 +351,10 @@ if __name__ == "__main__":
 
 # if __name__ == "__main__":
 #     os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-#     env = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3,  maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
-#     # print("Checking Environment")
-#     # check_env(env.unwrapped)
-#     # print("done checking environment")
+#     env = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3,  maze_mode = SMALL_MAZE,  pac_pos_mode = NORMAL_PAC_POS)
+#     print("Checking Environment")
+#     check_env(env.unwrapped)
+#     print("done checking environment")
 
 #     obs = env.reset()[0]
 #     done = False

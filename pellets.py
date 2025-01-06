@@ -44,9 +44,13 @@ class PelletGroup(object):
         self.pelletList = []
         self.powerpellets = []
         self.numEaten = 0
-        self.init_pellets_map = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)
-        self.init_p_pellets_map = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)
-        self.init_walls_map = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)
+
+        self.pellets_rows = np.zeros((GAME_ROWS), dtype=int)
+        self.pellets_cols = np.zeros((GAME_COLS), dtype=int)
+        self.init_walls_map = np.zeros((GAME_ROWS , GAME_COLS), dtype=int)
+
+        self.pp = np.zeros((12), dtype=int)
+
         self.createPelletList(pelletfile)
 
     def updatePoints(self):
@@ -58,14 +62,18 @@ class PelletGroup(object):
             powerpellet.update(dt)
 
     def createPelletList(self, pelletfile):
+        pp_idx = 0
         data = self.readPelletfile(pelletfile)
         for row in list(range(data.shape[0])):
             for col in list(range(data.shape[1])):
                 if data[row][col] in [".", "+"]:
                     pel = Pellet(row, col)
                     self.pelletList.append(pel)
-                    ### put the pellets reward in the maze
-                    self.init_pellets_map[pel.tile[1]][pel.tile[0]] = PELLET_MAZE
+                    ### put the pellets reward in the array
+                    pel_row = pel.tile[1]
+                    pel_col = pel.tile[0]
+                    self.pellets_rows[pel_row] +=1
+                    self.pellets_cols[pel_col] +=1
                     ###
                 elif data[row][col] in ["P", "p"]:
                     pp = PowerPellet(row, col)
@@ -73,7 +81,12 @@ class PelletGroup(object):
                     self.powerpellets.append(pp)
 
                     ### put the power pellets reward in the maze
-                    self.init_p_pellets_map[pp.tile[1]][pp.tile[0]] = 1
+                    pp_row = pp.tile[1]
+                    pp_col = pp.tile[0]
+                    self.pp[pp_idx] = pp_row             #first the x position of the power pellet
+                    self.pp[pp_idx + 1] = pp_col         #the y position of the power pellet
+                    self.pp[pp_idx + 2] = 1              # boolean 1 if the pp exist and 0 o.w
+                    pp_idx += 3
                     ###
 
                 ## if its a wall in the maze
