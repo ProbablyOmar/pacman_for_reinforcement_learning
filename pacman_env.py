@@ -278,7 +278,7 @@ class PacmanEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 7 , maze_mode = SMALL_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
+    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 7 , maze_mode = MAZE1 ,  pac_pos_mode = RANDOM_PAC_POS )
     env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_1_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 7,  maze_mode = MAZE1 , pac_pos_mode = RANDOM_PAC_POS)
     
     model_path = "./models/2_ghosts_3_ch_obs"
@@ -290,7 +290,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(model_path):  
         os.makedirs(model_path) 
-        env = env_render
+        env = env_not_render
         obs , _ = env.reset()
 
         optimizer_kwargs = dict(

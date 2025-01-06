@@ -173,7 +173,7 @@ class Maze2(MazeBase):
 class MazeData(object):
     def __init__(self):
         self.obj = None
-        self.mazedict = {0: Maze1, 1: Maze2 , 2 : Maze3 , 3: Maze4 , 4:Maze5 , 5:Maze6 , 6: small_maze}
+        self.mazedict = {0: Maze1, 1: Maze2 , 2 : Maze3 , 3: Maze4 , 4:Maze5 , 5:Maze6}
 
     def loadMaze(self, maze_mode , pac_pos_mode):
         if maze_mode == RAND_MAZE:

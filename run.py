@@ -576,7 +576,7 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=MAZE1, pac_pos_mode=RANDOM_PAC_POS)
+    game = GameController(rlTraining=True , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=RAND_MAZE, pac_pos_mode=RANDOM_PAC_POS)
     done = False
     agent_direction=LEFT
 
