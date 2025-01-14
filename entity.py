@@ -148,7 +148,7 @@ class Entity(object):
     def setBetweenNodes(self, direction): 
         if self.node.neighbors[direction] is not None:
             self.target = self.node.neighbors[direction]
-            self.position = (self.node.position + self.target.position) / 2.0
+            self.position = self.node.position 
             self.tile = (int((self.position.x // TILEWIDTH)), int((self.position.y // TILEHEIGHT) - 3)) 
 
     def setSpeed(self, speed):

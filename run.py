@@ -15,6 +15,7 @@ from mazedata import MazeData
 import numpy as np
 import time
 import copy
+import random
 
 class reward ():
     def __init__ (self , name , value):
@@ -61,10 +62,12 @@ class GameController(object):
         self.win = False
         self.done = False
         self.observation = None
+        self.episode_steps = 0
         self.startGame()
 
 
     def restartGame(self):
+        self.episode_steps = 0
         self.pacman.can_eat = True
         self.gameOver = False
         self.textgroup.hideText()
@@ -201,6 +204,7 @@ class GameController(object):
     #     self.take_step = True
 
     def update(self, agent_direction=None, render=True):
+        self.episode_steps += 1
         # print(agent_direction)
         self.RLreward = 0
         prev_pac_direction = self.pacman.direction
@@ -427,12 +431,13 @@ class GameController(object):
             ###update the pellet when eaten and delete the pellet rewards from it 
             if pellet.name == PELLET:
                 self.set_maze_map[pellet.tile[1]][pellet.tile[0]] -= PELLET_MAZE
+                self.updateScore(self.pellet_reward)
             elif pellet.name == POWERPELLET:
                 self.set_maze_map[pellet.tile[1]][pellet.tile[0]] -= PP_MAZE
+                self.updateScore(self.pp_reward)
             ###
 
             self.pellets.numEaten += 1
-            self.updateScore(self.pellet_reward)
             ## update pellet points each time you eat a new one
             self.pellets.updatePoints()
             self.pellet_reward.value = pellet.points
@@ -508,20 +513,32 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=10 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
+    game = GameController(rlTraining=True , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
     done = False
     agent_direction=LEFT
 
     while True:
-        game.update(render=True )
-        #print(game.observation)
+        #agent_direction = random.randint(-2,2)
+        game.update(render=True ,  agent_direction = agent_direction)
+        # g = {4 : "red: " , 5 : "pink: "}
+        # for ghost in game.ghosts:
+        #     print(g[ghost.name] , ghost.direction , " " , game.maze_map[ghost.tile[1]][ghost.tile[0]]  , " ", ghost.direction == LEFT and game.pacman.tile[0] < ghost.tile[0])
         done = game.done
+        # print(done)
+        #print(game.score)
+        #print(len(game.pellets.pelletList))
+        #print("step: " , game.episode_steps)
         #print("direction: ", game.pacman.direction)
-
-        if agent_direction == LEFT:
-            agent_direction = RIGHT
-        elif agent_direction == RIGHT:
+        if game.pacman.tile == (6,23):
+            agent_direction = UP
+        if game.pacman.tile == (6,5):
             agent_direction = LEFT
+        
+        #print("*****************************")
+        # if agent_direction == LEFT:
+        #     agent_direction = RIGHT
+        # elif agent_direction == RIGHT:
+        #     agent_direction = LEFT
 
         # print ("done: " , game.done)
         # print("gameover: " , game.gameOver)
