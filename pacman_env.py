@@ -33,17 +33,14 @@ class PacmanEnv(gym.Env):
         self.useless_steps = 0
         self.episode_steps = 0
 
-        self.num_frames_obs = 4
-        
         self.observation_space = spaces.Box(
-                    low = 0, high = 13 , shape = (self.num_frames_obs , GAME_ROWS , GAME_COLS) , dtype=np.int_
+                    low = 0, high = 13 , shape = (1 , GAME_ROWS , GAME_COLS) , dtype=np.int_
                 )
         
         self.action_space = spaces.Discrete(4, start=0)
 
         self._maze_map = np.zeros(shape=(GAME_ROWS , GAME_COLS), dtype=np.int_)
         self._last_obs = np.zeros(shape=(GAME_ROWS , GAME_COLS), dtype=np.int_)
-        self.observation_buffer = np.zeros(shape=(self.num_frames_obs , GAME_ROWS , GAME_COLS), dtype=np.int_)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -53,21 +50,17 @@ class PacmanEnv(gym.Env):
 
     def _getobs(self):
         self._maze_map = self.game.observation
-        #self._maze_map = np.expand_dims(self._maze_map , axis=0)
+        self._maze_map = np.expand_dims(self._maze_map , axis=0)
         return self._maze_map
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.game.restartGame()
-        self.game.done = False
         self.game_score = 0
 
         observation = self._getobs()
-        for i in range (self.num_frames_obs):
-            self.observation_buffer[i] = observation
-        #obs_buf = np.expand_dims(self.observation_buffer , axis=0) 
         info = {}
-        return self.observation_buffer, info
+        return observation, info
 
     def step(self, action):
         if self.game.move_mode == CONT_STEPS_MODE:
@@ -161,8 +154,6 @@ class PacmanEnv(gym.Env):
             # if reward > 0:
             #     print(reward)
 
-            self.observation_buffer[:-1] = self.observation_buffer[1:]
-            self.observation_buffer[-1] = observation
             #obs_buf = np.expand_dims(self.observation_buffer , axis=0)
             # print("***********")
             # print(reward)
@@ -171,7 +162,7 @@ class PacmanEnv(gym.Env):
             self.episode_steps +=1
             if terminated:
                 self.episode_steps = 0
-            return self.observation_buffer, reward, terminated, truncated, info
+            return observation, reward, terminated, truncated, info
 
 
     def render(self):
@@ -257,9 +248,9 @@ if __name__ == "__main__":
 # if __name__ == "__main__":
 #     os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 #     env = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 1,  maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
-#     # print("Checking Environment")
-#     # check_env(env.unwrapped)
-#     # print("done checking environment")
+#     print("Checking Environment")
+#     check_env(env.unwrapped)
+#     print("done checking environment")
 
 #     obs = env.reset()[0]
 #     done = False
