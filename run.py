@@ -470,6 +470,7 @@ class GameController(object):
             if pellet.name == PELLET:
                 self.dict_obs[f"row{pellet.tile[1]}"] -= 1    #a pellet is eaten from this row
                 self.dict_obs[f"col{pellet.tile[0]}"] -= 1    #a pellet is eaten from this column
+                self.updateScore(self.pellet_reward)
 
             elif pellet.name == POWERPELLET:
                 pp_row = pellet.tile[1]
@@ -477,10 +478,10 @@ class GameController(object):
                 for pp in range (len(self.pellets.powerpellets)):
                     if self.dict_obs[f"pp{pp}row"] == pp_row and self.dict_obs[f"pp{pp}col"] == pp_col:
                         self.dict_obs[f"pp{pp}exist"] = 0   ## eat the power pellet
+                self.updateScore(self.pp_reward)
             ###
 
             self.pellets.numEaten += 1
-            self.updateScore(self.pellet_reward)
             ## update pellet points each time you eat a new one
             self.pellets.updatePoints()
             self.pellet_reward.value = pellet.points
@@ -552,8 +553,6 @@ class GameController(object):
                 self.dict_obs["fruit_col"] = 0
                 self.dict_obs["fruit_exist"] = 0
                 self.fruit = None
-            
-
             
 
     def render(self):
