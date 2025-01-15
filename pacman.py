@@ -68,28 +68,56 @@ class Pacman(Entity):
 
     def update(self, dt, agent_direction=None):
         if self.move_mode == DISCRETE_STEPS_MODE:
+            # self.sprites.update(dt)
+            # #self.position += self.directions[self.direction] * self.speed * dt
+            # if agent_direction == None:
+            #     direction = self.getValidKey()
+            # else:
+            #     direction = agent_direction
+            # #if self.overshotTarget():
+
+            # self.node = self.getNewTarget(direction)
+            # if self.node.neighbors[PORTAL] is not None:
+            #     self.node = self.node.neighbors[PORTAL]
+            
+            # if self.target is not self.node:
+            #     self.direction = direction
+            # else:
+            #     self.target = self.getNewTarget(self.direction)
+
+            # if self.target == self.node:
+            #     self.direction = STOP
+            # self.setPosition()
+            #else:
+            # if self.oppositeDirection(direction):
+            #     self.reverseDirection()
             self.sprites.update(dt)
             #self.position += self.directions[self.direction] * self.speed * dt
+
             if agent_direction == None:
                 direction = self.getValidKey()
             else:
                 direction = agent_direction
-            #if self.overshotTarget():
+            self.initial_node = self.node
+            self.target = self.getNewTarget(direction)
             self.node = self.target
             if self.node.neighbors[PORTAL] is not None:
                 self.node = self.node.neighbors[PORTAL]
-            self.target = self.getNewTarget(direction)
-            if self.target is not self.node:
+
+            if self.initial_node is not self.node:
                 self.direction = direction
             else:
                 self.target = self.getNewTarget(self.direction)
+                self.node = self.target
 
-            if self.target == self.node:
+            if self.initial_node is self.node:
                 self.direction = STOP
+
             self.setPosition()
-            #else:
-            if self.oppositeDirection(direction):
-                self.reverseDirection()
+            # current_tile = (int((self.node.position.x // TILEWIDTH)), int((self.node.position.y // TILEHEIGHT) - 3)) 
+            # target_tile = (int((self.target.position.x // TILEWIDTH)), int((self.target.position.y // TILEHEIGHT) - 3))
+            # # target_tile = (int((self.target.position.x // TILEWIDTH)), int((self.target.position.y // TILEHEIGHT) - 3))
+            # print(current_tile , target_tile)
 
         elif self.move_mode == CONT_STEPS_MODE:
             self.sprites.update(dt)
