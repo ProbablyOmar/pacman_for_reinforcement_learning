@@ -494,47 +494,68 @@ class GameController(object):
         pygame.display.update()
 
 
-if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=2 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
-    done = False
-    agent_direction=LEFT
+# if __name__ == "__main__":
+#     game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 0 , pacman_lives=2 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
+#     done = False
+#     agent_direction=LEFT
+#     step = 0
+#     while not done:
+#         observation = np.zeros(4 , dtype=int)
+#         ## get Walls positions
+#         pacman_tile = game.pacman.tile
+#         maze_map = game.maze_map
 
-    while True:
-        #agent_direction = random.randint(-2,2)
-        game.update(render=True ,  agent_direction = agent_direction)
-        # g = {4 : "red: " , 5 : "pink: "}
-        # for ghost in game.ghosts:
-        #     print(g[ghost.name] , ghost.direction , " " , game.maze_map[ghost.tile[1]][ghost.tile[0]]  , " ", ghost.direction == LEFT and game.pacman.tile[0] < ghost.tile[0])
-        done = game.done
-        # print(done)
-        #print(game.score)
-        #print(len(game.pellets.pelletList))
-        #print("step: " , game.episode_steps)
-        #print("direction: ", game.pacman.direction)
-        if game.pacman.tile == (6,23):
-            agent_direction = UP
-        if game.pacman.tile == (6,5):
-            agent_direction = LEFT
+#         if pacman_tile[0] < GAME_COLS - 1 and maze_map[pacman_tile[1]][pacman_tile[0] + 1] == WALL_MAZE:  #all on the right
+#             observation[3] = 1
+#         if pacman_tile[0] > 0 and maze_map[pacman_tile[1]][pacman_tile[0] - 1] == WALL_MAZE:  #all on the left
+#             observation[1] = 1
+#         if pacman_tile[1] < GAME_ROWS - 1 and maze_map[pacman_tile[1] + 1][pacman_tile[0]] == WALL_MAZE:  #all don
+#             observation[2] = 1
+#         if pacman_tile[1] > 0 and maze_map[pacman_tile[1] - 1][pacman_tile[0]] == WALL_MAZE:  #all in the north
+#             observation[0] = 1
+            
+#         possible_actions = []
+#         for direction in range(4):
+#             if observation[direction] == 0:  # there is no wall in this direction
+#                 possible_actions.append(direction)
+
+#         agent_direction = random.choice(possible_actions) # Exploration
+#         agent_direction = get_direction_value(agent_direction)
+#         game.update(render=True ,  agent_direction = agent_direction)
+#         step+=1
+#         # g = {4 : "red: " , 5 : "pink: "}
+#         # for ghost in game.ghosts:
+#         #     print(g[ghost.name] , ghost.direction , " " , game.maze_map[ghost.tile[1]][ghost.tile[0]]  , " ", ghost.direction == LEFT and game.pacman.tile[0] < ghost.tile[0])
+#         done = game.done
+#         # print(done)
+#         #print(game.score)
+#         #print(len(game.pellets.pelletList))
+#         #print("step: " , game.episode_steps)
+#         #print("direction: ", game.pacman.direction)
+#         # if game.pacman.tile == (6,23):
+#         #     agent_direction = UP
+#         # if game.pacman.tile == (6,5):
+#         #     agent_direction = LEFT
         
-        #print("*****************************")
-        # if agent_direction == LEFT:
-        #     agent_direction = RIGHT
-        # elif agent_direction == RIGHT:
-        #     agent_direction = LEFT
+#         #print("*****************************")
+#         # if agent_direction == LEFT:
+#         #     agent_direction = RIGHT
+#         # elif agent_direction == RIGHT:
+#         #     agent_direction = LEFT
 
-        # print ("done: " , game.done)
-        # print("gameover: " , game.gameOver)
-        # print("win: " , game.win)
-        # print(game.score)
-        # print("*************************************")
-        # print(game.RLreward)
-        # print(game.done)
-        # print(game.pacman.tile)
-        # print(game.maze_map)
-        # if game.RLreward == HIT_WALL_PENALITY:
-        #     print("*************************************" , game.RLreward)
-        #print("*************************************" , game.pacman.tile)
-    # print ("done: " , game.done)
-    # print("gameover: " , game.gameOver)
-    # print("win: " , game.win)
-
+#         # print ("done: " , game.done)
+#         # print("gameover: " , game.gameOver)
+#         # print("win: " , game.win)
+#         # print(game.score)
+#         # print("*************************************")
+#         # print(game.RLreward)
+#         # print(game.done)
+#         # print(game.pacman.tile)
+#         # print(game.maze_map)
+#         # if game.RLreward == HIT_WALL_PENALITY:
+#         #     print("*************************************" , game.RLreward)
+#         #print("*************************************" , game.pacman.tile)
+#     # print ("done: " , game.done)
+#     # print("gameover: " , game.gameOver)
+#     # print("win: " , game.win)
+#     print(step)
