@@ -8,6 +8,10 @@ from q_table_obs import *
 import itertools
 import os
 import matplotlib.pyplot as plt 
+import torch
+
+#####
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def init_q_table ():
     q_table = {}
@@ -16,7 +20,8 @@ def init_q_table ():
     combinations = itertools.product(bool_val, bool_val, bool_val , bool_val , action_val , bool_val , bool_val , bool_val , bool_val , bool_val)
     combinations = list(combinations)
     for combination in combinations:
-        q_table[combination] = np.array([0,0,0,0])
+        # q_table[combination] = np.array([0,0,0,0])
+        q_table[combination] = torch.zeros(4, device=device)  #####on GPU
     return q_table
     
 
@@ -56,7 +61,9 @@ q_tables_DIR = "q_tables"
 #training loop
 for episode in range(EPISODES):
     episode_reward = 0   
-    observation = get_observation(game)
+    # observation = get_observation(game)
+    observation = torch.tensor(get_observation(game), device=device)
+
     episode_length = 0
 
     done = False
@@ -64,32 +71,47 @@ for episode in range(EPISODES):
         episode_length += 1
 
         if np.random.random() > EPSILON:
-            action = np.argmax(q_table[tuple(observation)])  # Exploitation
+            # action = np.argmax(q_table[tuple(observation)])  # Exploitation
+            observation_tuple = tuple(observation.cpu().numpy())
+
+            # Now access q_table using this tuple
+            action = torch.argmax(q_table[observation_tuple])
         else:
-            possible_actions = []
-            for direction in range(4):
-                if observation[direction] == 0:  # there is no wall in this direction
-                    possible_actions.append(direction)
-            action = random.choice(possible_actions) # Exploration
+            # possible_actions = []
+            # for direction in range(4):
+            #     if observation[direction] == 0:  # there is no wall in this direction
+            #         possible_actions.append(direction)
+            # action = random.choice(possible_actions) # Exploration
+            action = random.choice([0,1,2,3]) # Exploration
 
         agent_direction = get_direction_value(action)
         game.update(render=False ,agent_direction = agent_direction)
-        new_observation = get_observation(game)
+        # new_observation = get_observation(game)
+        new_observation = get_observation(game)  
+        new_observation = torch.tensor(new_observation, device=device)  
 
+        
         episode_reward += game.RLreward
         done = game.done
 
 
         if not done:
-            #update Q values
-            max_future_q = np.max(q_table[tuple(new_observation)])  # Max Q-value for next state (Value function)
-            current_q = q_table[tuple(observation)][action]        # Current Q-value
+            # #update Q values
+            # max_future_q = np.max(q_table[tuple(new_observation)])  # Max Q-value for next state (Value function)
+            # current_q = q_table[tuple(observation)][action]        # Current Q-value
+            # new_q = (1 - LEARNING_RATE) * current_q + LEARNING_RATE * (game.RLreward + DISCOUNT_FACTOR * max_future_q)
+            # q_table[tuple(observation)][action]  = new_q             
+            ######GPU tensors
+            max_future_q = torch.max(q_table[tuple(new_observation.cpu().numpy())])  # Max Q-value for next state
+            current_q = q_table[tuple(observation.cpu().numpy())][action]            # Current Q-value
             new_q = (1 - LEARNING_RATE) * current_q + LEARNING_RATE * (game.RLreward + DISCOUNT_FACTOR * max_future_q)
-            q_table[tuple(observation)][action]  = new_q             
-
+            q_table[tuple(observation.cpu().numpy())][action] = new_q 
+            
         else:
             print(f"episode{episode} , with reward = {episode_reward}, episode length = {episode_length}")
-            q_table[tuple(observation)][action] = 0
+            # q_table[tuple(observation)][action] = 0
+            q_table[tuple(observation.cpu().numpy())][action] = 0
+
 
         observation = new_observation
 
