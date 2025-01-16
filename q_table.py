@@ -66,12 +66,13 @@ for episode in range(EPISODES):
         if np.random.random() > EPSILON:
             action = np.argmax(q_table[tuple(observation)])  # Exploitation
         else:
-            possible_actions = []
-            for direction in range(4):
-                if observation[direction] == 0:  # there is no wall in this direction
-                    possible_actions.append(direction)
-            action = random.choice(possible_actions) # Exploration
-
+            # possible_actions = []
+            # for direction in range(4):
+            #     if observation[direction] == 0:  # there is no wall in this direction
+            #         possible_actions.append(direction)
+            # action = random.choice(possible_actions) # Exploration
+            action = random.choice([0,1,2,3])
+            
         agent_direction = get_direction_value(action)
         game.update(render=False ,agent_direction = agent_direction)
         new_observation = get_observation(game)
