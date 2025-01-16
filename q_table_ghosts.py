@@ -9,17 +9,34 @@ import itertools
 import os
 import matplotlib.pyplot as plt 
 
-def init_q_table (q_table_path):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if os.path.exists(q_table_path):
-        with open(q_table_path, "rb") as file:
-            q_table = pickle.load(file)
-            for key in q_table:
-                q_table[key] = q_table[key].to(device)
-        return q_table
-    else:
-        print(f"Error: Q-table file '{q_table_path}' not found.")
-        exit()
+# def init_q_table (q_table_path):
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#     if os.path.exists(q_table_path):
+#         with open(q_table_path, "rb") as file:
+#             q_table = pickle.load(file)
+#             for key in q_table:
+#                 q_table[key] = q_table[key].to(device)
+
+#         bool_val = [0,1]
+#         action_val = [4]
+#         combinations = itertools.product(bool_val, bool_val, bool_val , bool_val , action_val , bool_val , bool_val , bool_val , bool_val , bool_val)
+#         combinations = list(combinations)
+#         for combination in combinations:
+#             q_table[combination] = np.array([0,0,0,0])
+#         return q_table
+#     else:
+#         print(f"Error: Q-table file '{q_table_path}' not found.")
+#         exit()
+
+def init_q_table ():
+    q_table = {}
+    bool_val = [0,1]
+    action_val = [0,1,2,3,4]
+    combinations = itertools.product(bool_val, bool_val, bool_val , bool_val , action_val , bool_val , bool_val , bool_val , bool_val , bool_val)
+    combinations = list(combinations)
+    for combination in combinations:
+        q_table[combination] = np.array([0,0,0,0])
+    return q_table
 
 ##games
 game = GameController(rlTraining=True , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick = 0 , pacman_lives=3 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
@@ -91,14 +108,14 @@ for episode in range(EPISODES):
                         action = direction  # Exploitation
 
         else:   #when exploreing there is 0.5 probability we are going to cheat
-            if np.random.random() > CHEAT_PROB:
+            if np.random.random() > CHEAT_PROB and observation[4] != 4:
+                action = observation[4]
+            else:
                 possible_actions = []
                 for direction in range(4):
                     if observation[direction] == 0:  # there is no wall in this direction
                         possible_actions.append(direction)
                 action = random.choice(possible_actions) # Exploration
-            else:
-                action = observation[4]
 
         agent_direction = get_direction_value(action)
         game.update(render=False ,agent_direction = agent_direction)
@@ -117,14 +134,14 @@ for episode in range(EPISODES):
                             next_action = direction  # Exploitation
 
             else:
-                if np.random.random() > CHEAT_PROB:
+                if np.random.random() > CHEAT_PROB and new_observation[4] != 4:
+                    next_action = new_observation[4]
+                else:
                     possible_actions = []
                     for direction in range(4):
                         if observation[direction] == 0:  # there is no wall in this direction
                             possible_actions.append(direction)
                     next_action = random.choice(possible_actions) # Exploration
-                else:
-                    next_action = new_observation[4]
 
             future_q = q_table[tuple(new_observation)][next_action]  # Max Q-value for next state
             current_q = q_table[tuple(observation)][action]        # Current Q-value
