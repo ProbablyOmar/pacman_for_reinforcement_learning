@@ -202,6 +202,13 @@ class GameController(object):
     #     self.take_step = True
 
     def update(self, agent_direction=None, render=True):  
+        ## handle terminal states
+        if self.lives <= 0:
+            self.restartGame()
+        if self.pellets.isEmpty():
+            self.nextLevel()
+        #########################
+
         self.episode_steps += 1
         # print(agent_direction)
         self.RLreward = 0
@@ -255,12 +262,12 @@ class GameController(object):
         if self.RLreward == 0:
             self.updateScore(self.time_penality)
 
-        ## handle terminal states
-        if self.lives <= 0:
-            self.restartGame()
-        if self.pellets.isEmpty():
-            self.nextLevel()
-        #########################
+        # ## handle terminal states
+        # if self.lives <= 0:
+        #     self.restartGame()
+        # if self.pellets.isEmpty():
+        #     self.nextLevel()
+        # #########################
 
         if self.flashBG:
             self.flashTimer += dt
@@ -495,7 +502,7 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
+    game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
     done = False
     agent_direction=LEFT
     step = 0
@@ -504,7 +511,10 @@ if __name__ == "__main__":
     while not done:
         game.update(render=True)
         print("done: " ,  game.done)
+        print("num of pellets_remaining" , len(game.pellets.pelletList))
         print(game.RLreward)
+        print(game.maze_map)
+        print("win: " , game.win)
         print("***********************")
         step+=1
         # g = {4 : "red: " , 5 : "pink: "}

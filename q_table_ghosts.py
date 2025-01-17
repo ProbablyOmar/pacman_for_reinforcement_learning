@@ -9,34 +9,34 @@ import itertools
 import os
 import matplotlib.pyplot as plt 
 
-# def init_q_table (q_table_path):
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#     if os.path.exists(q_table_path):
-#         with open(q_table_path, "rb") as file:
-#             q_table = pickle.load(file)
-#             for key in q_table:
-#                 q_table[key] = q_table[key].to(device)
+def init_q_table (q_table_path):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if os.path.exists(q_table_path):
+        with open(q_table_path, "rb") as file:
+            q_table = pickle.load(file)
+            for key in q_table:
+                q_table[key] = q_table[key].to(device)
 
-#         bool_val = [0,1]
-#         action_val = [4]
-#         combinations = itertools.product(bool_val, bool_val, bool_val , bool_val , action_val , bool_val , bool_val , bool_val , bool_val , bool_val)
-#         combinations = list(combinations)
-#         for combination in combinations:
-#             q_table[combination] = np.array([0,0,0,0])
-#         return q_table
-#     else:
-#         print(f"Error: Q-table file '{q_table_path}' not found.")
-#         exit()
+        bool_val = [0,1]
+        action_val = [4]
+        combinations = itertools.product(bool_val, bool_val, bool_val , bool_val , action_val , bool_val , bool_val , bool_val , bool_val , bool_val)
+        combinations = list(combinations)
+        for combination in combinations:
+            q_table[combination] = np.array([0,0,0,0])
+        return q_table
+    else:
+        print(f"Error: Q-table file '{q_table_path}' not found.")
+        exit()
 
-def init_q_table ():
-    q_table = {}
-    bool_val = [0,1]
-    action_val = [0,1,2,3,4]
-    combinations = itertools.product(bool_val, bool_val, bool_val , bool_val , action_val , bool_val , bool_val , bool_val , bool_val , bool_val)
-    combinations = list(combinations)
-    for combination in combinations:
-        q_table[combination] = np.array([0,0,0,0])
-    return q_table
+# def init_q_table ():
+#     q_table = {}
+#     bool_val = [0,1]
+#     action_val = [0,1,2,3,4]
+#     combinations = itertools.product(bool_val, bool_val, bool_val , bool_val , action_val , bool_val , bool_val , bool_val , bool_val , bool_val)
+#     combinations = list(combinations)
+#     for combination in combinations:
+#         q_table[combination] = np.array([0,0,0,0])
+#     return q_table
 
 ##games
 game = GameController(rlTraining=True , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick = 0 , pacman_lives=3 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
@@ -71,7 +71,7 @@ total_states = 2048 #from our obs space (16 * 4 * 16 * 2)
 total_actions = 4
 
 # Q-Table initialization
-q_table = init_q_table()
+q_table = init_q_table("put here the path of the q_table")
 
 ##tracking reward
 ep_rewards = []
@@ -83,17 +83,18 @@ NUM_WINS = 0
 aggr_ep_rewards = {'ep': [], 'avg_score': [], 'ep_length' : [] , 'num_wins' : [] , 'level_comp_per' : []}
 
 MAX_AVG_REWARD = float("-inf")
-PLOTS_DIR = 'plots_sarsa_ghosts'
-q_tables_DIR = "q_tables_sarsa_ghosts"
+PLOTS_DIR_BIG = 'plots_sarsa_ghosts_rewardsAndEpisodeLengths'
+PLOTS_DIR_SMALL = 'plots_sarsa_ghosts_WinAndLevelCompletion'
+q_tables_DIR = "q_tables_sarsa_ghosts_complete"
 
 #training loop
 for episode in range(EPISODES):
     episode_reward = 0   
     observation = get_observation(game)
     episode_length = 0
-    num_pellets_remaining = len(game.pellets.pelletList)
-    NUM_PELLETS = len(game.pellets.pelletList)
-
+    ###
+    #num_pellets_remaining = len(game.pellets.pelletList)
+    ###
     done = False
 
     while not done:  #start the episode
@@ -147,15 +148,18 @@ for episode in range(EPISODES):
             current_q = q_table[tuple(observation)][action]        # Current Q-value
             new_q = (1 - LEARNING_RATE) * current_q + LEARNING_RATE * (game.RLreward + DISCOUNT_FACTOR * future_q)
             q_table[tuple(observation)][action]  = new_q 
-
-            num_pellets_remaining = len(game.pellets.pelletList)  ## calculate the num_pellets_remaining before done because at this time the number of pellets will be reset
+            ###
+            #num_pellets_remaining = len(game.pellets.pelletList)  ## calculate the num_pellets_remaining before done because at this time the number of pellets will be reset
+            ###
         else:
+            num_pellets_remaining = len(game.pellets.pelletList)
             print(f"episode{episode} , with reward = {episode_reward}, episode length = {episode_length} , won: {game.win} , remaining pellets: {num_pellets_remaining}")
             q_table[tuple(observation)][action] = (1 - LEARNING_RATE) * current_q + LEARNING_RATE * (game.RLreward)
 
         observation = new_observation
 
-    if num_pellets_remaining == 0:
+    ### 
+    if game.win == True:
         NUM_WINS +=1
 
     comp_per = (NUM_PELLETS - num_pellets_remaining) / NUM_PELLETS
@@ -167,8 +171,10 @@ for episode in range(EPISODES):
     EPSILON = max(MIN_EPSILON , EPSILON * EPSILON_DECAY)
 
     #dir for saving the plots     
-    if not os.path.exists(PLOTS_DIR):
-        os.makedirs(PLOTS_DIR)
+    if not os.path.exists(PLOTS_DIR_BIG):
+        os.makedirs(PLOTS_DIR_BIG)
+    if not os.path.exists(PLOTS_DIR_SMALL):
+        os.makedirs(PLOTS_DIR_SMALL)
     if not os.path.exists(q_tables_DIR):
         os.makedirs(q_tables_DIR)
     
@@ -191,16 +197,26 @@ for episode in range(EPISODES):
         aggr_ep_rewards['num_wins'].append(avg_num_wins)
         aggr_ep_rewards['level_comp_per'].append(avg_level_comp_per)
 
-        #plotting 
+        #plotting Big plots (avg reward and avg episode lengths)
+        plt.figure(figsize=(10, 6))
         plt.plot(aggr_ep_rewards['ep'], aggr_ep_rewards['avg_score'], label ="Average Reward")
         plt.plot(aggr_ep_rewards['ep'], aggr_ep_rewards['ep_length'], label="AVG Episode length")
+        plt.legend(loc="best")
+        #save plotting 
+        plt.title(f"Training Rewards (Episode {episode})")
+        plot_filename = os.path.join(PLOTS_DIR_BIG, f'training_rewards_plot_episode_{episode}.png')
+        plt.savefig(plot_filename)
+        plt.close()
+
+        #plotting small plots (in percentage and level completion percentage)
+        plt.figure(figsize=(10, 6))
         plt.plot(aggr_ep_rewards['ep'], aggr_ep_rewards['num_wins'], label="AVG number of wins")
         plt.plot(aggr_ep_rewards['ep'], aggr_ep_rewards['level_comp_per'], label="percentage of eaten pellets relative to all pellets")
         plt.legend(loc="best")
 
         #save plotting 
         plt.title(f"Training Rewards (Episode {episode})")
-        plot_filename = os.path.join(PLOTS_DIR, f'training_rewards_plot_episode_{episode}.png')
+        plot_filename = os.path.join(PLOTS_DIR_SMALL, f'training_rewards_plot_episode_{episode}.png')
         plt.savefig(plot_filename)
         plt.close()
 
