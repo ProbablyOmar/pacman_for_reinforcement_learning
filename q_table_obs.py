@@ -73,6 +73,8 @@ def get_direction_idx (direction):
         return 2
     elif direction == RIGHT:
         return 3
+    elif direction == STOP:
+        return 4
 
 def get_direction_value (idx):
     if idx == 0:
@@ -83,6 +85,8 @@ def get_direction_value (idx):
         return DOWN
     elif idx == 3:
         return RIGHT
+    elif idx == 4:
+        return STOP
 
 def a_star (maze , start , goal):
     if start == goal:
@@ -473,5 +477,4 @@ def get_observation (game):
 #     done = game.done
 
 #     #print(game.done)
-
 
