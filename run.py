@@ -202,6 +202,13 @@ class GameController(object):
     #     self.take_step = True
 
     def update(self, agent_direction=None, render=True):  
+        ## handle terminal states
+        if self.lives <= 0:
+            self.restartGame()
+        if self.pellets.isEmpty():
+            self.nextLevel()
+        #########################
+
         self.episode_steps += 1
         # print(agent_direction)
         self.RLreward = 0
@@ -255,12 +262,12 @@ class GameController(object):
         if self.RLreward == 0:
             self.updateScore(self.time_penality)
 
-        ## handle terminal states
-        if self.lives <= 0:
-            self.restartGame()
-        if self.pellets.isEmpty():
-            self.nextLevel()
-        #########################
+        # ## handle terminal states
+        # if self.lives <= 0:
+        #     self.restartGame()
+        # if self.pellets.isEmpty():
+        #     self.nextLevel()
+        # #########################
 
         if self.flashBG:
             self.flashTimer += dt
@@ -504,8 +511,11 @@ if __name__ == "__main__":
     while not done:
         game.update(render=True)
         print("done: " ,  game.done)
+        print("num of pellets_remaining" , len(game.pellets.pelletList))
         print(game.RLreward)
-        print("***********************")
+        print(game.maze_map)
+        print("win: " , game.win)
+        print("*")
         step+=1
         # g = {4 : "red: " , 5 : "pink: "}
         # for ghost in game.ghosts:
@@ -523,7 +533,7 @@ if __name__ == "__main__":
         # if game.pacman.tile == (6,5):
         #     agent_direction = LEFT
         
-        #print("*****************************")
+        #print("*")
         # if agent_direction == LEFT:
         #     agent_direction = RIGHT
         # elif agent_direction == RIGHT:
@@ -533,14 +543,14 @@ if __name__ == "__main__":
         # print("gameover: " , game.gameOver)
         # print("win: " , game.win)
         # print(game.score)
-        # print("*************************************")
+        # print("*")
         # print(game.RLreward)
         # print(game.done)
         # print(game.pacman.tile)
         # print(game.maze_map)
         # if game.RLreward == HIT_WALL_PENALITY:
-        #     print("*************************************" , game.RLreward)
-        #print("*************************************" , game.pacman.tile)
+        #     print("*" , game.RLreward)
+        #print("*" , game.pacman.tile)
     # print ("done: " , game.done)
     # print("gameover: " , game.gameOver)
     # print("win: " , game.win)

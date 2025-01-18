@@ -41,6 +41,7 @@ INKY = 6
 CLYDE = 7
 FRUIT = 8
 
+NUM_PELLETS = 244  #####
 
 # MODES
 

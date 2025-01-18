@@ -20,7 +20,7 @@ game = GameController(
     pac_pos_mode=NORMAL_PAC_POS
 )
 
-q_table_path = "q_tables_sarsa_ghosts\\q_table_330_episodes.pkl"
+q_table_path = "q_tables_sarsa_ghosts_complete/q_table__episodes.pkl"
 if os.path.exists(q_table_path):
     with open(q_table_path, "rb") as file:
         q_table = pickle.load(file)
