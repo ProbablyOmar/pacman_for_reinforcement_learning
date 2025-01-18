@@ -426,11 +426,13 @@ class ANN (BaseFeaturesExtractor):
 
         self.ann = nn.Sequential(
             nn.Linear(input_dim, 128),  # First hidden layer with 128 units
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(128, 64),        # Second hidden layer with 64 units
-            nn.ReLU(),
-            nn.Linear(64, features_dim),  # Output layer with `features_dim` units
-            nn.ReLU()
+            nn.GELU(),
+            nn.Linear(64, 32),        # Second hidden layer with 64 units
+            nn.GELU(),
+            nn.Linear(32, features_dim),  # Output layer with `features_dim` units
+            nn.GELU()
         )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:

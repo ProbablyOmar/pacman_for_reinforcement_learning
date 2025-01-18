@@ -150,7 +150,7 @@ class PacmanEnv(gym.Env):
         self.game.restartGame()
         self.game.done = False
         self.game_score = 0
-
+        self.episode_steps = 0
         observation = self._getobs()
         #obs_buf = np.expand_dims(self.observation_buffer , axis=0) 
         info = {}
@@ -263,8 +263,6 @@ class PacmanEnv(gym.Env):
             # print(terminated)
             # print("episode steps: " , self.episode_steps)
             self.episode_steps +=1
-            if terminated:
-                self.episode_steps = 0
             return observation, reward, terminated, truncated, info
 
 
@@ -281,7 +279,7 @@ if __name__ == "__main__":
     env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 7 , maze_mode = MAZE1 ,  pac_pos_mode = RANDOM_PAC_POS )
     env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_1_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 7,  maze_mode = MAZE1 , pac_pos_mode = RANDOM_PAC_POS)
     
-    model_path = "./models/2_ghosts_3_ch_obs"
+    model_path = "./models/2_ghosts_small_but_informative"
 
     log_path = "./logs/fit"
    
@@ -301,7 +299,7 @@ if __name__ == "__main__":
         policy_kwargs = dict(
             features_extractor_class= ANN ,
             optimizer_kwargs=optimizer_kwargs,
-            features_extractor_kwargs=dict(features_dim=256),
+            features_extractor_kwargs=dict(features_dim=32),
             optimizer_class=Adam,  # Using Adam optimizer here
         )
 
@@ -329,7 +327,7 @@ if __name__ == "__main__":
         #print("here ***********: " , model.exploration_fraction , model.exploration_initial_eps , model.exploration_final_eps , model.policy)
         time_steps = 1000000
         for i in range (50):
-            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/2_ghosts_3_ch_obs")
+            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/2_ghosts_small_but_informative")
             model.save(f"{model_path}/{(i+1)*time_steps}") 
 
     elif os.path.exists(model_path):
@@ -341,6 +339,7 @@ if __name__ == "__main__":
         episodes = 10
         for ep in range(episodes):
             done = False
+            obs , _ = env.reset()
             while not done: 
                 action , next_state = model.predict(obs)
                 obs, reward, terminated, truncated, info = env.step(int(action))
