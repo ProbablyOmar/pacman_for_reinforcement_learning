@@ -202,14 +202,20 @@ class GameController(object):
         self.maze_map[1] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)     #scared ghosts
         self.maze_map[2] = self.init_pellets_map              #pellets
         self.maze_map[3] = self.init_p_pellets_map            #power pellets
-        self.maze_map[4] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)
+        self.maze_map[4] = np.zeros((GAME_ROWS,GAME_COLS), dtype=int)  #ghosts
 
     # def update_rate (self , update_clock):
     #     self.update_clock.tick(update_clock) / 1000.0
     #     self.take_step = True
 
     def update(self, agent_direction=None, render=True):
-        # print(agent_direction)
+        ## handle terminal states
+        if self.lives <= 0:
+            self.restartGame()
+        if self.pellets.isEmpty():
+            self.nextLevel()
+        #########################
+
         self.RLreward = 0
         prev_pac_direction = self.pacman.direction
         #print ("order direction: " , agent_direction , " pacman direction: " , self.pacman.direction)
@@ -264,12 +270,12 @@ class GameController(object):
         if self.RLreward == 0:
             self.updateScore(self.time_penality)
         ## now maxe map and reward are ready you can handle terminal states
-        ## handle terminal states
-        if self.lives <= 0:
-            self.restartGame()
-        if self.pellets.isEmpty():
-            self.nextLevel()
-        #########################
+        # ## handle terminal states
+        # if self.lives <= 0:
+        #     self.restartGame()
+        # if self.pellets.isEmpty():
+        #     self.nextLevel()
+        # #########################
 
         if self.flashBG:
             self.flashTimer += dt

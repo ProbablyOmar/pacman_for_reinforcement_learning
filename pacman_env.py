@@ -85,7 +85,8 @@ class PacmanEnv(gym.Env):
         self.game.restartGame()
         self.game.done = False
         self.game_score = 0
-
+        self.episode_steps = 0
+        
         observation = self._getobs()
         #obs_buf = np.expand_dims(self.observation_buffer , axis=0) 
         info = {}
@@ -198,8 +199,6 @@ class PacmanEnv(gym.Env):
             # print(terminated)
             # print("episode steps: " , self.episode_steps)
             self.episode_steps +=1
-            if terminated:
-                self.episode_steps = 0
             return observation, reward, terminated, truncated, info
 
 
