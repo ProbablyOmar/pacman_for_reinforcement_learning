@@ -14,8 +14,8 @@ from stable_baselines3.dqn import MultiInputPolicy
 from torch.optim import RMSprop, Adam
 import os
 import copy
+from a_star_obs import *
 
-GHOST_MODES = {SCATTER: 0, CHASE: 0, FREIGHT: 1, SPAWN: 2}
 
 
 if "pacman-v0" not in gym.envs.registry:
@@ -35,7 +35,7 @@ class PacmanEnv(gym.Env):
 
         self.observation_space = spaces.Box(
                     low = 0, high = 13 , shape = (1 , GAME_ROWS , GAME_COLS) , dtype=np.int_
-                )
+        )
         
         self.action_space = spaces.Discrete(4, start=0)
 
@@ -49,7 +49,7 @@ class PacmanEnv(gym.Env):
             self.clock = self.game.clock
 
     def _getobs(self):
-        self._maze_map = self.game.observation
+        self._maze_map = self.game.maze_map
         self._maze_map = np.expand_dims(self._maze_map , axis=0)
         return self._maze_map
 
@@ -57,6 +57,7 @@ class PacmanEnv(gym.Env):
         super().reset(seed=seed)
         self.game.restartGame()
         self.game_score = 0
+        self.episode_steps = 0
 
         observation = self._getobs()
         info = {}
@@ -111,13 +112,18 @@ class PacmanEnv(gym.Env):
                         # else:
                         #     self.useless_steps = 0
                     self.episode_steps +=1
-                    if terminated:
-                        self.episode_steps = 0
                     return observation, step_reward, terminated, truncated, info 
 
 
         elif self.game.move_mode == DISCRETE_STEPS_MODE:
-            action -= 2
+            if action == 0:
+                action = RIGHT
+            elif action == 1:
+                action = DOWN
+            elif action == 2:
+                action = UP
+            elif action == 3:
+                action = LEFT
             #step_reward = TIME_PENALITY
             if self.render_mode == "human":
                 self.game.update(
@@ -160,8 +166,6 @@ class PacmanEnv(gym.Env):
             # print(terminated)
             # print("episode steps: " , self.episode_steps)
             self.episode_steps +=1
-            if terminated:
-                self.episode_steps = 0
             return observation, reward, terminated, truncated, info
 
 
@@ -175,8 +179,8 @@ class PacmanEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
-    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3,  maze_mode = MAZE1)
+    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 3 , maze_mode = MAZE1 ,  pac_pos_mode = RANDOM_PAC_POS)
+    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3,  maze_mode = MAZE1 , pac_pos_mode = RANDOM_PAC_POS)
     
     model_path = "./models/2_ghosts_2"
 
@@ -247,14 +251,14 @@ if __name__ == "__main__":
 
 # if __name__ == "__main__":
 #     os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-#     env = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 1,  maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
-#     print("Checking Environment")
-#     check_env(env.unwrapped)
-#     print("done checking environment")
+#     env = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 1,  maze_mode = MAZE1 ,  pac_pos_mode = NORMAL_PAC_POS)
+#     # print("Checking Environment")
+#     # check_env(env.unwrapped)
+#     # print("done checking environment")
 
 #     obs = env.reset()[0]
 #     done = False
-#     action = 4
+#     action = 3
 #     num_steps = 1
 #     while not done:
 #         # if num_steps == 10:
@@ -263,7 +267,7 @@ if __name__ == "__main__":
 #         env.render()
 #         obs, reward, terminated, _, _ = env.step(action)
 #         done = terminated 
-        
+
 #         # print("***************************************")
 #         # print(obs.shape)
 #         # print(obs[0][0])

@@ -61,7 +61,6 @@ class GameController(object):
         self.gameOver = False
         self.win = False
         self.done = False
-        self.observation = None
         self.episode_steps = 0
         self.startGame()
 
@@ -196,7 +195,6 @@ class GameController(object):
 
         self.set_maze_map = self.pellets.map_init_pell_rewards
         self.maze_map = copy.deepcopy(self.set_maze_map)
-        self.observation = self.maze_map
         
 
     # def update_rate (self , update_clock):
@@ -204,6 +202,13 @@ class GameController(object):
     #     self.take_step = True
 
     def update(self, agent_direction=None, render=True):
+        ## handle terminal states
+        if self.lives <= 0:
+            self.restartGame()
+        if self.pellets.isEmpty():
+            self.nextLevel()
+        #########################
+
         self.episode_steps += 1
         # print(agent_direction)
         self.RLreward = 0
@@ -238,8 +243,7 @@ class GameController(object):
             self.checkGhostEvents()
 
             ##now self.maze_map is ready
-            self.observation = self.maze_map
-            del self.maze_map
+            
 
         ##this should be before handling terminal state area and after check_pellets_events and check_ghosts_events
         self.done = self.gameOver or self.win
@@ -259,12 +263,12 @@ class GameController(object):
         if self.RLreward == 0:
             self.updateScore(self.time_penality)
 
-        ## handle terminal states
-        if self.lives <= 0:
-            self.restartGame()
-        if self.pellets.isEmpty():
-            self.nextLevel()
-        #########################
+        # ## handle terminal states
+        # if self.lives <= 0:
+        #     self.restartGame()
+        # if self.pellets.isEmpty():
+        #     self.nextLevel()
+        # #########################
 
         if self.flashBG:
             self.flashTimer += dt
@@ -533,8 +537,9 @@ if __name__ == "__main__":
             agent_direction = UP
         if game.pacman.tile == (6,5):
             agent_direction = LEFT
-        
-        #print("*****************************")
+        print(game.maze_map)
+        print(game.done)
+        print("*****************************")
         # if agent_direction == LEFT:
         #     agent_direction = RIGHT
         # elif agent_direction == RIGHT:
