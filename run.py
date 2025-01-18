@@ -207,7 +207,13 @@ class GameController(object):
     #     self.take_step = True
 
     def update(self, agent_direction=None, render=True):
-        # print(agent_direction)
+        ## handle terminal states
+        if self.lives <= 0:
+            self.restartGame()
+        if self.pellets.isEmpty():
+            self.nextLevel()
+        #########################
+
         self.RLreward = 0
         prev_pac_direction = self.pacman.direction
         #print ("order direction: " , agent_direction , " pacman direction: " , self.pacman.direction)
@@ -259,12 +265,12 @@ class GameController(object):
         if self.RLreward == 0:
             self.updateScore(self.time_penality)
         ## now maxe map and reward are ready you can handle terminal states
-        ## handle terminal states
-        if self.lives <= 0:
-            self.restartGame()
-        if self.pellets.isEmpty():
-            self.nextLevel()
-        #########################
+        # ## handle terminal states
+        # if self.lives <= 0:
+        #     self.restartGame()
+        # if self.pellets.isEmpty():
+        #     self.nextLevel()
+        # #########################
 
         if self.flashBG:
             self.flashTimer += dt
@@ -527,22 +533,34 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=10 , maze_mode=RAND_MAZE, pac_pos_mode=RANDOM_PAC_POS)
+    game = GameController(rlTraining=True , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
     done = False
     agent_direction=LEFT
 
     while True:
-        #print(game.maze_map[2])
-        game.update(render=True )
-        #print(game.observation)
+        #agent_direction = random.randint(-2,2)
+        game.update(render=True ,  agent_direction = agent_direction)
+        # g = {4 : "red: " , 5 : "pink: "}
+        # for ghost in game.ghosts:
+        #     print(g[ghost.name] , ghost.direction , " " , game.maze_map[ghost.tile[1]][ghost.tile[0]]  , " ", ghost.direction == LEFT and game.pacman.tile[0] < ghost.tile[0])
         done = game.done
+        # print(done)
+        #print(game.score)
+        #print(len(game.pellets.pelletList))
+        #print("step: " , game.episode_steps)
         #print("direction: ", game.pacman.direction)
-
-        if agent_direction == LEFT:
-            agent_direction = RIGHT
-        elif agent_direction == RIGHT:
+        if game.pacman.tile == (6,23):
+            agent_direction = UP
+        if game.pacman.tile == (6,5):
             agent_direction = LEFT
-        
+        print(game.maze_map)
+        print(game.done)
+        print("*****************************")
+        # if agent_direction == LEFT:
+        #     agent_direction = RIGHT
+        # elif agent_direction == RIGHT:
+        #     agent_direction = LEFT
+
         # print ("done: " , game.done)
         # print("gameover: " , game.gameOver)
         # print("win: " , game.win)

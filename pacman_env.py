@@ -58,7 +58,7 @@ class PacmanEnv(gym.Env):
                     dtype=np.int_
                 )
         
-        self.action_space = spaces.Discrete(5, start=0)
+        self.action_space = spaces.Discrete(4, start=0)
 
         self._maze_map = np.zeros(shape=(GAME_ROWS , GAME_COLS), dtype=np.int_)
         self._last_obs = np.zeros(shape=(GAME_ROWS , GAME_COLS), dtype=np.int_)
@@ -79,7 +79,7 @@ class PacmanEnv(gym.Env):
         self.game.restartGame()
         self.game.done = False
         self.game_score = 0
-
+        self.episode_steps = 0
         observation = self._getobs()
         #obs_buf = np.expand_dims(self.observation_buffer , axis=0) 
         info = {}
@@ -87,7 +87,15 @@ class PacmanEnv(gym.Env):
 
     def step(self, action):
         if self.game.move_mode == CONT_STEPS_MODE:
-            action -= 2
+            if action == 0:
+                action = RIGHT
+            elif action == 1:
+                action = DOWN
+            elif action == 2:
+                action = UP
+            elif action == 3:
+                action = LEFT
+
             step_reward = TIME_PENALITY
             while True:
                 if self.render_mode == "human":
@@ -133,7 +141,14 @@ class PacmanEnv(gym.Env):
 
 
         elif self.game.move_mode == DISCRETE_STEPS_MODE:
-            action -= 2
+            if action == 0:
+                action = RIGHT
+            elif action == 1:
+                action = DOWN
+            elif action == 2:
+                action = UP
+            elif action == 3:
+                action = LEFT
             #step_reward = TIME_PENALITY
             if self.render_mode == "human":
                 self.game.update(
@@ -176,8 +191,6 @@ class PacmanEnv(gym.Env):
             # print(terminated)
             # print("episode steps: " , self.episode_steps)
             self.episode_steps +=1
-            if terminated:
-                self.episode_steps = 0
             return observation, reward, terminated, truncated, info
 
 
