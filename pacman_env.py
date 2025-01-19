@@ -179,10 +179,10 @@ class PacmanEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 3 , maze_mode = MAZE1 ,  pac_pos_mode = RANDOM_PAC_POS)
+    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 3 , maze_mode = MAZE1 ,  pac_pos_mode = NORMAL_PAC_POS)
     env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3,  maze_mode = MAZE1 , pac_pos_mode = RANDOM_PAC_POS)
     
-    model_path = "./models/2_ghosts_2"
+    model_path = "./models/DQN_MODEL"
 
     log_path = "./logs/fit"
    
@@ -229,7 +229,7 @@ if __name__ == "__main__":
         #print("here ***********: " , model.exploration_fraction , model.exploration_initial_eps , model.exploration_final_eps , model.policy)
         time_steps = 1000000
         for i in range (50):
-            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/2_ghosts_2")
+            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/DQN_MODEL")
             model.save(f"{model_path}/{(i+1)*time_steps}") 
 
     elif os.path.exists(model_path):
