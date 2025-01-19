@@ -449,12 +449,13 @@ class GameController(object):
             ###update the pellet when eaten and delete the pellet rewards from it 
             if pellet.name == PELLET:
                 self.init_rewards_map[pellet.tile[1]][pellet.tile[0]] -= PELLET_MAZE
+                self.updateScore(self.pellet_reward)
             elif pellet.name == POWERPELLET:
                 self.init_rewards_map[pellet.tile[1]][pellet.tile[0]] -= PP_MAZE
+                self.updateScore(self.pp_reward)
             ###
 
             self.pellets.numEaten += 1
-            self.updateScore(self.pellet_reward)
             ## update pellet points each time you eat a new one
             self.pellets.updatePoints()
             self.pellet_reward.value = pellet.points
