@@ -153,7 +153,7 @@ class GameController(object):
             move_mode= self.move_mode
         )
         self.pellets = PelletGroup(mazeFilePath.resolve())
-        self.ghosts = GhostGroup(self.nodes.getStartTempNode(), self.pacman , move_mode=self.move_mode)
+        self.ghosts = GhostGroup(self.nodes.getStartTempNode(), self.pacman , move_mode=self.move_mode , mode = self.mode)
         self.ghosts.pinky.setStartNode(
             self.nodes.getNodeFromTiles(*self.mazedata.obj.addOffset(2, 3))
         )
@@ -535,9 +535,9 @@ if __name__ == "__main__":
     done = False
     agent_direction=LEFT
 
-    while True:
+    while not done:
         #agent_direction = random.randint(-2,2)
-        game.update(render=True ,  agent_direction = agent_direction)
+        game.update(render=True)
         # g = {4 : "red: " , 5 : "pink: "}
         # for ghost in game.ghosts:
         #     print(g[ghost.name] , ghost.direction , " " , game.maze_map[ghost.tile[1]][ghost.tile[0]]  , " ", ghost.direction == LEFT and game.pacman.tile[0] < ghost.tile[0])
@@ -549,8 +549,11 @@ if __name__ == "__main__":
         #print("direction: ", game.pacman.direction)
         if game.pacman.tile == (6,23):
             agent_direction = UP
-        if game.pacman.tile == (6,5):
+        if game.pacman.tile == (6,1):
             agent_direction = LEFT
+        if game.ghosts.blinky.tile == (2,1):
+            agent_direction = RIGHT
+        print(game.score)
         #print("*****************************")
         # if agent_direction == LEFT:
         #     agent_direction = RIGHT
