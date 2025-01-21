@@ -5,15 +5,19 @@ from gymnasium.envs.registration import register
 from gymnasium.utils.env_checker import check_env
 import numpy as np
 from gymnasium import spaces
+from pettingzoo import ParallelEnv
 from run import GameController
 from constants import *
-from DQN_model import *
-from stable_baselines3 import DQN , PPO
-from modified_tensorboard import TensorboardCallback
+from DQN_model import CustomCNN
+from stable_baselines3 import DQN
 from stable_baselines3.dqn import MultiInputPolicy
-from torch.optim import RMSprop, Adam
+from pettingzoo.test import parallel_api_test
 import os
 import copy
+import functools
+import math
+
+
 
 GHOST_MODES = {SCATTER: 0, CHASE: 0, FREIGHT: 1, SPAWN: 2}
 
@@ -22,28 +26,17 @@ if "pacman-v0" not in gym.envs.registry:
     register(id="pacman-v0", entry_point="pacman_env:PacmanEnv", max_episode_steps=1000)
 
 
-class PacmanEnv(gym.Env):
+class PacmanEnv(ParallelEnv):
     metadata = {"render_modes": ["human"], "render_fps": 60}
 
-    def __init__(self, render_mode=None , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = MAZE3 , pac_pos_mode = RANDOM_PAC_POS):
-
-        self.game = GameController(rlTraining = True , mode = mode , move_mode = move_mode , clock_tick = clock_tick , pacman_lives = pacman_lives , maze_mode=maze_mode , pac_pos_mode = pac_pos_mode)
-        self.num_pellets_last = 0
+    def __init__(self, render_mode=None):
+        self.game = GameController(rlTraining=True)
         self.game_score = 0
         self.useless_steps = 0
-        self.episode_steps = 0
+        self.possible_agents = ["pacman", "ghost"]
 
-        self.num_frames_obs = 4
-        
-        self.observation_space = spaces.Box(
-                    low = 0, high = 13 , shape = (self.num_frames_obs , GAME_ROWS , GAME_COLS) , dtype=np.int_
-                )
-        
-        self.action_space = spaces.Discrete(5, start=0)
-
-        self._maze_map = np.zeros(shape=(GAME_ROWS , GAME_COLS), dtype=np.int_)
-        self._last_obs = np.zeros(shape=(GAME_ROWS , GAME_COLS), dtype=np.int_)
-        self.observation_buffer = np.zeros(shape=(self.num_frames_obs , GAME_ROWS , GAME_COLS), dtype=np.int_)
+        self._maze_map = np.zeros(shape=(GAME_ROWS, GAME_COLS), dtype=np.int_)
+        self._last_obs = np.zeros(shape=(GAME_ROWS, GAME_COLS), dtype=np.int_)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -51,121 +44,103 @@ class PacmanEnv(gym.Env):
             self.window = self.game.screen
             self.clock = self.game.clock
 
+    @functools.lru_cache(maxsize=None)
+    def observation_space(self, agent):
+        if agent == "pacman":
+            return spaces.Box(
+                low=0, high=13, shape=(1, GAME_ROWS, GAME_COLS), dtype=np.int_
+            )
+        elif agent == "ghost":
+            return spaces.Box(0, np.array([SCREENWIDTH, SCREENHEIGHT]), dtype=int)
+
+    @functools.lru_cache(maxsize=None)
+    def action_space(self, agent):
+        return spaces.Discrete(5, start=0)
+
     def _getobs(self):
+        
         self._maze_map = self.game.observation
-        #self._maze_map = np.expand_dims(self._maze_map , axis=0)
-        return self._maze_map
+        self._maze_map = np.expand_dims(self._maze_map, axis=0)
+        
+        observations = {
+            "pacman": self._maze_map,              
+            "ghost": self.game.pacman.position     
+            }
+
+        #global state for the critic network
+        combined_state = {
+        "pacman": self._maze_map,
+        "ghost": self.game.pacman.position,
+        "ghost_position": [ghost.position for ghost in self.game.ghosts]
+    }
+        return observations, combined_state
 
     def reset(self, seed=None, options=None):
-        super().reset(seed=seed)
+        self.agents = copy.copy(self.possible_agents)
         self.game.restartGame()
-        self.game.done = False
-        self.game_score = 0
 
-        observation = self._getobs()
-        for i in range (self.num_frames_obs):
-            self.observation_buffer[i] = observation
-        #obs_buf = np.expand_dims(self.observation_buffer , axis=0) 
-        info = {}
-        return self.observation_buffer, info
+        observations, _ = self._getobs()
+        info = {"pacman": "", "ghost": ""}
+        return observations, info
 
-    def step(self, action):
-        if self.game.move_mode == CONT_STEPS_MODE:
-            action -= 2
-            step_reward = TIME_PENALITY
-            while True:
-                if self.render_mode == "human":
-                    self.game.update(
-                        agent_direction=action,
-                        render=True
-                        #clocktick=self.metadata["render_fps"],
-                    )
-                else:
-                    self.game.update(
-                        agent_direction=action,
-                        render=False
-                        #clocktick=self.metadata["render_fps"],
-                    )
-                
-                terminated = self.game.done
-                truncated = False
-                reward = self.game.RLreward
-                observation = self._getobs()
-                info = {}
-
-                if reward != TIME_PENALITY:
-                    step_reward = reward
-
-                if not np.array_equal(observation , self._last_obs): 
-                    self.num_pellets_last = len(self.game.pellets.pelletList)
-                    np.copyto(self._last_obs , observation)
-                    self.game_score += step_reward
-
-                    if self.game.mode == SAFE_MODE:
-                        if reward == TIME_PENALITY or reward == HIT_WALL_PENALITY:
-                            self.useless_steps +=1
-                            if self.useless_steps >= MAX_USELESS_STEPS:
-                                self.game.done = True
-                                terminated = self.game.done
-                                self.useless_steps = 0
-                        # else:
-                        #     self.useless_steps = 0
-                    self.episode_steps +=1
-                    if terminated:
-                        self.episode_steps = 0
-                    return observation, step_reward, terminated, truncated, info 
-
-
-        elif self.game.move_mode == DISCRETE_STEPS_MODE:
-            action -= 2
-            #step_reward = TIME_PENALITY
+    def step(self, actions):
+        
+        pacman_action = actions["pacman"]
+        ghost_action = actions["ghost"]
+    
+        pacman_action -= 2
+        step_reward = TIME_PENALITY
+        while True:
             if self.render_mode == "human":
                 self.game.update(
-                    agent_direction=action,
-                    render=True
-                    #clocktick=self.metadata["render_fps"],
+                    agent_directions={"pacman": pacman_action, "ghost": ghost_action},
+                    render=True,
+                    # clocktick=self.metadata["render_fps"],
                 )
             else:
                 self.game.update(
-                    agent_direction=action,
-                    render=False
-                    #clocktick=self.metadata["render_fps"],
+                    agent_direction={"pacman": pacman_action, "ghost": ghost_action},
+                    render=False,
+                    # clocktick=self.metadata["render_fps"],
                 )
-            self.num_pellets_last = len(self.game.pellets.pelletList)
-            terminated = self.game.done
-            truncated = False
-            reward = self.game.RLreward
-            observation = self._getobs()
-            info = {}
+                
+            pacman_position = self.game.pacman.position
+            ghost_position = self.game.ghosts[0].position
+            distance = math.hypot(pacman_position.x - ghost_position.x, pacman_position.y - ghost_position.y)
+            
+            ghostReward = (
+                1 / distance
+            ) * 50 + self.game.pacmanEaten * 500
+            
+            
+            # ghostReward = (
+            #     1 / (self.game.ghosts[0].position - self.game.pacman.position)
+            # ) * 50 + self.game.pacmanEaten * 500
+            
+            terminated = {a: self.game.done for a in self.agents}
+            truncated = {a: False for a in self.agents}
+            reward = {"pacman": self.game.RLreward, "ghost": ghostReward}
+            observations = self._getobs()
+            info = {a: {} for a in self.agents}
 
-            #if not np.array_equal(observation , self._last_obs): 
-            #np.copyto(self._last_obs , observation)
-            self.game_score += reward
+            if reward != TIME_PENALITY:
+                step_reward = reward
 
-            if self.game.mode == SAFE_MODE:
-                if reward == TIME_PENALITY or reward == HIT_WALL_PENALITY:
-                    self.useless_steps += 1
-                    if self.useless_steps >= MAX_USELESS_STEPS:
-                        self.game.done = True
-                        terminated = self.game.done
-                        self.useless_steps = 0
-                else:
-                    self.useless_steps = 0
-            # if reward > 0:
-            #     print(reward)
+            if not np.array_equal(observations["pacman"], self._last_obs):
+                np.copyto(self._last_obs, observations["pacman"])
+                self.game_score += step_reward["pacman"]
 
-            self.observation_buffer[:-1] = self.observation_buffer[1:]
-            self.observation_buffer[-1] = observation
-            #obs_buf = np.expand_dims(self.observation_buffer , axis=0)
-            # print("***********")
-            # print(reward)
-            # print(terminated)
-            # print("episode steps: " , self.episode_steps)
-            self.episode_steps +=1
-            if terminated:
-                self.episode_steps = 0
-            return self.observation_buffer, reward, terminated, truncated, info
-
+                if self.game.mode == SAFE_MODE:
+                    if reward == TIME_PENALITY or reward == HIT_WALL_PENALITY:
+                        self.useless_steps += 1
+                        if self.useless_steps >= MAX_USELESS_STEPS:
+                            self.game.done = True
+                            terminated = {a: self.game.done for a in self.agents}
+                            self.agents = []
+                            self.useless_steps = 0
+                    # else:
+                    #     self.useless_steps = 0
+                return observations, step_reward, terminated, truncated, info
 
     def render(self):
         if self.render_mode == "human":

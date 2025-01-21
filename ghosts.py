@@ -23,14 +23,35 @@ class Ghost(Entity):
         self.can_be_eaten = True
         
 
-    def update(self, dt):
-        self.sprites.update(dt)
-        self.mode.update(dt)
-        if self.mode.current is SCATTER:
-            self.scatter()
-        elif self.mode.current is CHASE:
-            self.chase()
-        Entity.update(self, dt)
+    def update(self, dt , agent_direction = None):
+        if agent_direction == None:
+            self.sprites.update(dt)
+            self.mode.update(dt)
+            if self.mode.current is SCATTER:
+                self.scatter()
+            elif self.mode.current is CHASE:
+                self.chase()
+            Entity.update(self, dt)
+
+        else:
+            self.sprites.update(dt)
+            direction = agent_direction
+            self.initial_node = self.node
+            self.target = self.getNewTarget(direction)
+            self.node = self.target
+            if self.node.neighbors[PORTAL] is not None:
+                self.node = self.node.neighbors[PORTAL]
+
+            if self.initial_node is not self.node:
+                self.direction = direction
+            else:
+                self.target = self.getNewTarget(self.direction)
+                self.node = self.target
+
+            if self.initial_node is self.node:
+                self.direction = STOP
+
+            self.setPosition()
 
     def startFreight(self):
         self.mode.setFreightMode()
@@ -163,9 +184,9 @@ class GhostGroup(object):
         for ghost in self.ghosts:
             ghost.move_mode = self.move_mode
 
-    def update(self, dt):
-        for ghost in self:
-            ghost.update(dt)
+    def update(self, dt , agents_directions):
+        for i , ghost in enumerate(self):
+            ghost.update(dt , agents_directions[i])
 
     def startFreight(self):
         for ghost in self:
