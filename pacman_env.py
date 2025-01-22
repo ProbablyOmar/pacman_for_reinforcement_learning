@@ -16,6 +16,10 @@ import os
 import copy
 import functools
 import math
+from torch.optim import Adam
+# from modified_tensorboard import TensorboardCallback
+from multi_ddpg import Agent
+from buffer import MultiAgentReplayBuffer
 
 
 
@@ -79,9 +83,9 @@ class PacmanEnv(ParallelEnv):
         self.agents = copy.copy(self.possible_agents)
         self.game.restartGame()
 
-        observations, _ = self._getobs()
+        observation, _ = self._getobs()
         info = {"pacman": "", "ghost": ""}
-        return observations, info
+        return observation, info
 
     def step(self, actions):
         
@@ -150,76 +154,124 @@ class PacmanEnv(ParallelEnv):
         if self.window is not None:
             pygame.event.post(pygame.event.Event(QUIT))
 
+#############################
+#train maddpg 
 
 if __name__ == "__main__":
-    env_not_render = gym.make("pacman-v0", max_episode_steps = 10_000 ,  mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 1 , maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
-    env_render = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3,  maze_mode = MAZE1)
     
-    model_path = "./models/2_ghosts_2"
+    env_not_render = PacmanEnv(render_mode=None)
+    env_render = PacmanEnv(render_mode="human")
 
-    log_path = "./logs/fit"
-   
-    if not os.path.exists(log_path):
-        os.makedirs(log_path)
 
-    if not os.path.exists(model_path):  
-        os.makedirs(model_path) 
-        env = env_not_render
-        obs , _ = env.reset()
+    model_path = "./models/maddpg"
+    log_path = "./logs/maddpg"
+    chkpt_dir = "./tmp/maddpg/"
 
-        optimizer_kwargs = dict(
-            betas = (0.95, 0.999),  # Correct format: tuple for beta1 and beta2
-            eps = 1e-8,  # Small epsilon to prevent division by zero
-        )
+    os.makedirs(model_path, exist_ok=True)
+    os.makedirs(log_path, exist_ok=True)
+    os.makedirs(chkpt_dir, exist_ok=True)
 
-        policy_kwargs = dict(
-            features_extractor_class=Updated_CustomCNN_2,
-            optimizer_kwargs=optimizer_kwargs,
-            features_extractor_kwargs=dict(features_dim=256),
-            optimizer_class=Adam,  # Using Adam optimizer here
-        )
+    
+    env = env_render
+    n_agents = 2  
+    actor_dims = [env.observation_space(agent).shape[0] for agent in env.possible_agents]  # Actor input dimensions
+    critic_dims = sum(actor_dims)  # Critic input dimensions "joint state"
+    n_actions = 5  
 
-        model = DQN(
-            "CnnPolicy",
-            env,
-            learning_rate=0.00025,
-            buffer_size=10_000,
-            learning_starts=10_000,
-            batch_size=32,
-            gamma=0.99,
-            train_freq=(4, "step"),
-            gradient_steps=2,
-            target_update_interval=500,
-            exploration_fraction=0.1,
-            exploration_initial_eps=1,
-            exploration_final_eps=0.5,
-            policy_kwargs=policy_kwargs,
-            verbose=1,
+    
+    model_final_path = os.path.join(model_path, "MADDPG_model.pth")
+    if not os.path.exists(model_final_path):
+        print("Training new MADDPG model...")
+
+        
+        model = Agent(
+            actor_dims,  # Actor; Takes individual states
+            critic_dims,  # Critic; Takes joint states and joint actions 
+            n_agents,
+            n_actions,
+            alpha=0.01,
+            beta=0.01,
+            chkpt_dir=chkpt_dir,
             tensorboard_log=log_path,
-            device='cuda',
+            device='cuda'
         )
 
-        #print("here ***********: " , model.exploration_fraction , model.exploration_initial_eps , model.exploration_final_eps , model.policy)
-        time_steps = 1000000
-        for i in range (50):
-            model.learn(total_timesteps = time_steps , progress_bar=True , reset_num_timesteps = False , tb_log_name = "./cnn/2_ghosts_2")
-            model.save(f"{model_path}/{(i+1)*time_steps}") 
+        
+        memory = MultiAgentReplayBuffer(1000000, critic_dims, actor_dims, n_agents, n_actions, batch_size=1024)
 
-    elif os.path.exists(model_path):
-        env = env_render
-        obs , _ = env.reset()
-        model_final_path = f"./{model_path}/3000000.zip"
-        model = DQN.load(model_final_path , env = env)
+        total_episodes = 5000
+        PRINT_INTERVAL = 100
+        total_steps = 0
+        best_score = -np.inf
+        score_history = []
 
+        for episode in range(total_episodes):
+            obs, _ = env.reset()  
+            done = [False] * n_agents  
+            episode_score = 0
+
+            while not any(done):
+                # Chooses actions for each agent based on their individual states
+                # ##### Actor
+                actions = model.choose_action(obs)  
+                actions = {agent: actions[i] for i, agent in enumerate(env.possible_agents)}  
+                print(f"Actions: {actions}")
+                for agent in env.possible_agents:
+                    print(f"{agent} action space: {env.action_space(agent)}")
+                obs_, rewards, done, _ = env.step(actions)
+
+                # Prepare joint state and next joint state for the critic
+                state = np.concatenate([observations[agent] for agent in env.possible_agents])  # Joint state
+                state_ = np.concatenate([obs_[agent] for agent in env.possible_agents])  # Next joint state
+
+                ###store in replay buffer
+                memory.store_transition(observations, state, actions, rewards, obs_, state_, done)  
+
+                if total_steps > memory.batch_size:
+                    #learning step; Update actor and critic networks
+                    actor_loss, critic_loss = model.learn(memory)
+                    print(f"Actor Loss: {actor_loss}, Critic Loss: {critic_loss}")
+
+                
+                observations = obs_
+                episode_score += sum(rewards.values())
+                total_steps += 1
+
+            
+            score_history.append(episode_score)
+            avg_score = np.mean(score_history[-100:])
+            
+            if avg_score > best_score:
+                best_score = avg_score
+                model.save_checkpoint(path=model_final_path)
+
+            if episode % PRINT_INTERVAL == 0:
+                print(f"Episode {episode}, Average Score: {avg_score:.2f}")
+
+    else:
+        print("Loading pre-trained MADDPG model...")
+        #load the pre-trained model
+        model = MADDPGAgent.load_checkpoint(model_final_path)
+
+        #run for evaluation
         episodes = 10
         for ep in range(episodes):
-            done = False
-            while not done: 
-                action , next_state = model.predict(obs)
-                obs, reward, terminated, truncated, info = env.step(int(action))
-                print(env.game_score)
-                done = terminated
-        env.close()
+            observations, _ = env.reset()
+            done = [False] * n_agents
+            episode_score = 0
+
+            while not any(done):
+                
+                actions = model.choose_action(observation=observations, explore=False)  
+                obs_, rewards, done, _ = env.step(actions)
+                episode_score += sum(rewards.values())
+                observations = obs_
+
+            print(f"Episode {ep + 1} - Total Score: {episode_score}")
+
+    env.close()
+
+
 
 
 # if __name__ == "__main__":

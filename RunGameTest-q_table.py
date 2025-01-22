@@ -12,15 +12,15 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 game = GameController(
     rlTraining=True,
-    mode=SAFE_MODE,
+    mode=NORMAL_MODE,
     move_mode=DISCRETE_STEPS_MODE,
     clock_tick=10,
-    pacman_lives=1,
+    pacman_lives=3,
     maze_mode=MAZE1,
     pac_pos_mode=NORMAL_PAC_POS
 )
 
-q_table_path = "q_tables\\q_table_190_episodes.pkl"
+q_table_path = "q_tables_sarsa_ghosts_complete/q_table_420_episodes.pkl"
 if os.path.exists(q_table_path):
     with open(q_table_path, "rb") as file:
         q_table = pickle.load(file)
@@ -39,4 +39,3 @@ while not done:
     agent_direction = get_direction_value(agent_direction)
     game.update(render=True, agent_direction=agent_direction)
     done = game.done
-
