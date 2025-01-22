@@ -432,8 +432,6 @@ def get_observation (game):
                     direction_closest_pellet_escape_ghosts[1] = direction_pellet
         prefered_dir = direction_closest_pellet_escape_ghosts[1]
 
-        if prefered_dir == STOP:
-            print("direction to closest pellet: " , direction_closest_pellet_escape_ghosts)
         #print("prefered_direction_closest_pellet: ",prefered_dir)
 
     #prefered_dir = get_direction_idx(prefered_dir)
