@@ -30,8 +30,8 @@ os.makedirs(RUNS_DIR, exist_ok=True)
 # 'Agg': used to generate plots as images and save them to a file instead of rendering to screen
 matplotlib.use('Agg')
 
-#device = 'cuda'
-device = 'cpu' # force cpu, sometimes GPU not always faster than CPU due to overhead of moving data to GPU
+device = 'cuda'
+#device = 'cpu' # force cpu, sometimes GPU not always faster than CPU due to overhead of moving data to GPU
 
 # Deep Q-Learning Agent
 class Agent():
