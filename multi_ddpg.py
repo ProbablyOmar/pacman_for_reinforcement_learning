@@ -6,9 +6,10 @@ import torch.optim as optim
 import numpy as np
 import pygame
 import vector
+from buffer import MultiAgentReplayBuffer
 
 class Agent:
-    def __init__(self, actor_dims, critic_dims, n_actions, n_agents, alpha=0.01 , beta=0.01 , gamma=0.95 , tau=0.01 , tensorboard_log=None , device= 'cuda' ,chkpt_dir="tmp/maddpg"):
+    def __init__(self, actor_dims, critic_dims, n_actions, n_agents, alpha=0.01 , beta=0.01 , gamma=0.95 , tau=0.01 , device= 'cuda' ,chkpt_dir="tmp/maddpg"):
         self.gamma = gamma
         self.tau = tau
         self.n_actions = n_actions
@@ -57,13 +58,34 @@ class Agent:
         self.target_critic.load_state_dict(critic_state_dict)
         
     ######    
-    def choose_action(self, observation):
-        state = T.tensor([observation], dtype=T.float).to(self.actor.device)
+    # def choose_action(self, observation):
+    #     state = T.tensor([observation], dtype=T.float).to(self.actor.device)
+    #     actions = self.actor.forward(state)
+    #     noise = T.rand(self.n_actions).to(self.actor.device)
+    #     action = actions + noise
+
+    #     return action.detach().cpu().numpy()[0]
+    def choose_action(self, observations, noise_scale=0.1):
+        """
+        Choose an action based on the current policy and add exploration noise.
+        Args:
+            observation (array-like): The current observation/state of the agent.
+            noise_scale (float): The scale of the noise to be added for exploration.
+        Returns:
+            np.array: The chosen action.
+        """
+
+        state = T.tensor(observations, dtype=T.float).to(self.actor.device)
         actions = self.actor.forward(state)
-        noise = T.rand(self.n_actions).to(self.actor.device)
+        noise = T.normal(mean=0, std=noise_scale, size=actions.shape).to(self.actor.device)
         action = actions + noise
 
+        # Clip the action to be within valid bounds (assuming [-1, 1])
+        action = T.clamp(action, -1, 1)
+
         return action.detach().cpu().numpy()[0]
+
+
         
     def save_models(self):
         self.actor.save_checkpoint()
@@ -79,14 +101,14 @@ class Agent:
         
         
 class MADDPG:
-    def __init__(self, actor_dims, critic_dims, n_agents, n_actions, alpha=0.01 , beta=0.01 , gamma=0.99 , tau=0.01 , chkpt_dir="tmp/maddpg/" , device= 'cuda'):    
+    def __init__(self, actor_dims, critic_dims, n_agents, n_actions, alpha=0.01 , beta=0.01, gamma=0.99 , tau=0.01 , tensorboard_log=None , chkpt_dir="tmp/maddpg/" , device= 'cuda'):    
         self.agents = []
         self.n_agents = n_agents
         self.n_actions = n_actions
         
         
         for agent_id in range(self.n_agents):
-            self.agents.append(MADDPGAgent(actor_dims[agent_id], critic_dims, n_actions, agent_id, alpha=alpha , beta=beta , chkpt_dir=chkpt_dir))   
+            self.agents.append(Agent(actor_dims[agent_id], critic_dims, n_actions, agent_id, alpha=alpha , beta=beta , chkpt_dir=chkpt_dir))   
 
     def save_checkpoint(self):
         for agent in self.agents:
@@ -96,14 +118,30 @@ class MADDPG:
         for agent in self.agents:
             agent.load_models()
 
-    def choose_action(self, observation):
+
+    # def choose_action(self, observation):
+    #     actions = []
+    #     for agent_id , agent in enumerate(self.agents):
+    #         action = agent.choose_action(observation[agent_id])
+    #         actions.append(action)
+    #     return actions
+    
+    def choose_action(self, raw_obs):
+        """
+        Each agent chooses its action based on its observation.
+        Args:
+            raw_obs (list): List of observations for all agents.
+        Returns:
+            list: List of actions chosen by each agent.
+        """
         actions = []
-        for agent_id , agent in enumerate(self.agents):
-            action = agent.choose_action(observation[agent_id])
+        for i, agent in enumerate(self.agents):
+            action = agent.choose_action(raw_obs[i])
             actions.append(action)
+
         return actions
 
-    
+
     def learn(self, memory):
         if not memory.ready():
             return
@@ -123,23 +161,23 @@ class MADDPG:
         old_agents_actions = []
         
         
-        for agent_id, agent in enumerate(self.agents):
-            new_states = T.tensor(actor_new_states[agent_id], dtype=T.float).unsqueeze(1).to(device)
+        for i, agent in enumerate(self.agents):
+            new_states = T.tensor(actor_new_states[i], dtype=T.float).unsqueeze(1).to(device)
             new_pi = agent.target_actor.forward(new_states)
             all_agents_new_mu_actions.append(new_pi)
 
-            mu_states = T.tensor(actor_states[agent_id], dtype=T.float).unsqueeze(1).to(device)
+            mu_states = T.tensor(actor_states[i], dtype=T.float).unsqueeze(1).to(device)
             pi = agent.actor.forward(mu_states)
             all_agents_new_actions.append(pi)
 
-            old_agents_actions.append(actions[agent_id].unsqueeze(1))
+            old_agents_actions.append(actions[i].unsqueeze(1))
 
             
         new_actions = T.cat([acts for acts in all_agents_new_actions], dim=1)
         mu = T.cat([acts for acts in all_agents_new_mu_actions], dim=1)
         old_actions = T.cat([acts for acts in old_agents_actions], dim=1)
         
-        for agent_id, agent in enumerate(self.agents):
+        for i, agent in enumerate(self.agents):
             
         
             critic_value_ = agent.target_critic.forward(states_, new_actions).flatten()
@@ -147,7 +185,7 @@ class MADDPG:
             critic_value = agent.critic.forward(states, old_actions).flatten()
             
             
-            target = rewards[:, agent_id] + agent.gamma*critic_value_
+            target = rewards[:, i] + agent.gamma*critic_value_
             critic_loss = F.mse_loss(target, critic_value)
             agent.critic.optimizer.zero_grad()
             critic_loss.backward(retain_graph=True)

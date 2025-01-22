@@ -79,6 +79,7 @@ class GameController(object):
         self.fruit = None
         self.startGame()
         self.score = 0
+        self.pacmanEaten = 0 #####
         self.textgroup.updateScore(self.score)
         self.textgroup.updateLevel(self.level)
         if not (self.rlTraining):

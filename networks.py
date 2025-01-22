@@ -24,9 +24,11 @@ class CriticNetwork(nn.Module):
         
         input_dims = (GAME_ROWS, GAME_COLS)
         self.height, self.width = input_dims
+        
         self.n_agents = n_agents
         self.n_actions = n_actions
         ###our network layers
+        #####################
         self.fc1 = nn.Linear(self.height * self.width + n_agents * n_actions, 256)  
         self.fc2 = nn.Linear(256, 128)
         self.fc3 = nn.Linear(128, 1)
@@ -84,7 +86,7 @@ class ActorNetwork(nn.Module):
     def __init__(self, alpha, input_dims, n_actions, name, chkpt_dir="tmp/maddpg", device='cuda'):
         super(ActorNetwork, self).__init__()
         
-       
+        input_dims = (GAME_ROWS, GAME_COLS)
         self.height, self.width = input_dims
         
         self.device = T.device(device if T.cuda.is_available() else 'cpu')

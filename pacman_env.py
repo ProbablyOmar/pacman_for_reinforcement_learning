@@ -18,8 +18,9 @@ import functools
 import math
 from torch.optim import Adam
 # from modified_tensorboard import TensorboardCallback
-from multi_ddpg import Agent
+from multi_ddpg import MADDPG
 from buffer import MultiAgentReplayBuffer
+import numpy as np
 
 
 
@@ -66,25 +67,29 @@ class PacmanEnv(ParallelEnv):
         self._maze_map = self.game.observation
         self._maze_map = np.expand_dims(self._maze_map, axis=0)
         
+        ghost_position = np.array([self.game.pacman.position.x, self.game.pacman.position.y])
+        
         observations = {
             "pacman": self._maze_map,              
             "ghost": self.game.pacman.position     
             }
 
-        #global state for the critic network
-        combined_state = {
-        "pacman": self._maze_map,
-        "ghost": self.game.pacman.position,
-        "ghost_position": [ghost.position for ghost in self.game.ghosts]
-    }
-        return observations, combined_state
+    #     #global state for the critic network
+    #     combined_state = {
+    #     "pacman": self._maze_map,
+    #     "ghost": self.game.pacman.position,
+    #     "ghost_position": [ghost.position for ghost in self.game.ghosts]
+    # }
+        return observations 
+    # , combined_state
 
     def reset(self, seed=None, options=None):
         self.agents = copy.copy(self.possible_agents)
         self.game.restartGame()
 
-        observation, _ = self._getobs()
-        info = {"pacman": "", "ghost": ""}
+        observation = self._getobs()
+        info = {"pacman": {}, "ghost": {}}
+        
         return observation, info
 
     def step(self, actions):
@@ -103,7 +108,7 @@ class PacmanEnv(ParallelEnv):
                 )
             else:
                 self.game.update(
-                    agent_direction={"pacman": pacman_action, "ghost": ghost_action},
+                    agents_directions={"pacman": pacman_action, "ghost": ghost_action},
                     render=False,
                     # clocktick=self.metadata["render_fps"],
                 )
@@ -131,7 +136,8 @@ class PacmanEnv(ParallelEnv):
                 step_reward = reward
 
             if not np.array_equal(observations["pacman"], self._last_obs):
-                np.copyto(self._last_obs, observations["pacman"])
+                np.copyto(self._last_obs, np.array(observations["pacman"], dtype=np.int32)) ###
+
                 self.game_score += step_reward["pacman"]
 
                 if self.game.mode == SAFE_MODE:
@@ -156,6 +162,12 @@ class PacmanEnv(ParallelEnv):
 
 #############################
 #train maddpg 
+
+def obs_list_to_state_vector(observation):
+    state = np.array([])
+    for obs in observation:
+        state = np.concatenate([state, obs])
+    return state
 
 if __name__ == "__main__":
     
@@ -184,7 +196,7 @@ if __name__ == "__main__":
         print("Training new MADDPG model...")
 
         
-        model = Agent(
+        maddpg_agents = MADDPG(
             actor_dims,  # Actor; Takes individual states
             critic_dims,  # Critic; Takes joint states and joint actions 
             n_agents,
@@ -192,7 +204,7 @@ if __name__ == "__main__":
             alpha=0.01,
             beta=0.01,
             chkpt_dir=chkpt_dir,
-            tensorboard_log=log_path,
+            # tensorboard_log=log_path,
             device='cuda'
         )
 
@@ -200,144 +212,64 @@ if __name__ == "__main__":
         memory = MultiAgentReplayBuffer(1000000, critic_dims, actor_dims, n_agents, n_actions, batch_size=1024)
 
         total_episodes = 5000
+        MAX_STEP = 25
         PRINT_INTERVAL = 100
         total_steps = 0
         best_score = -np.inf
         score_history = []
-
+        evaluate = False
+        
+        if evaluate:
+            maddpg_agents.load_checkpoint()
+            
+        
         for episode in range(total_episodes):
             obs, _ = env.reset()  
             done = [False] * n_agents  
-            episode_score = 0
+            episode_step = 0
 
             while not any(done):
+                if evaluate:
+                    env.render()
                 # Chooses actions for each agent based on their individual states
                 # ##### Actor
-                actions = model.choose_action(obs)  
-                actions = {agent: actions[i] for i, agent in enumerate(env.possible_agents)}  
-                print(f"Actions: {actions}")
-                for agent in env.possible_agents:
-                    print(f"{agent} action space: {env.action_space(agent)}")
+                actions =  maddpg_agents.choose_action(obs) 
                 obs_, rewards, done, _ = env.step(actions)
+                
+                # actions = {agent: actions[i] for i, agent in enumerate(env.possible_agents)}  
+                # print(f"Actions: {actions}")
+                # for agent in env.possible_agents:
+                #     print(f"{agent} action space: {env.action_space(agent)}")
+                
 
                 # Prepare joint state and next joint state for the critic
-                state = np.concatenate([observations[agent] for agent in env.possible_agents])  # Joint state
-                state_ = np.concatenate([obs_[agent] for agent in env.possible_agents])  # Next joint state
-
-                ###store in replay buffer
-                memory.store_transition(observations, state, actions, rewards, obs_, state_, done)  
-
-                if total_steps > memory.batch_size:
-                    #learning step; Update actor and critic networks
-                    actor_loss, critic_loss = model.learn(memory)
-                    print(f"Actor Loss: {actor_loss}, Critic Loss: {critic_loss}")
-
+                state = obs_list_to_state_vector(obs)  # Joint state
+                state_ = obs_list_to_state_vector(obs_)  # Next joint state
                 
-                observations = obs_
-                episode_score += sum(rewards.values())
-                total_steps += 1
+                if episode_step >= MAX_STEPS:
+                    done = [True]*n_agents
+                
+                ###store in replay buffer
+                memory.store_transition(obs, state, actions, rewards, obs_, state_, done)  
 
-            
-            score_history.append(episode_score)
+                if total_steps % 100 == 0 and not evaluate:
+                    maddpg_agents.learn(memory)
+                
+                obs = obs_
+                
+                score += sum(reward)
+                total_steps += 1
+                episode_step += 1
+                
+            score_history.append(score)
             avg_score = np.mean(score_history[-100:])
             
-            if avg_score > best_score:
-                best_score = avg_score
-                model.save_checkpoint(path=model_final_path)
-
-            if episode % PRINT_INTERVAL == 0:
-                print(f"Episode {episode}, Average Score: {avg_score:.2f}")
-
-    else:
-        print("Loading pre-trained MADDPG model...")
-        #load the pre-trained model
-        model = MADDPGAgent.load_checkpoint(model_final_path)
-
-        #run for evaluation
-        episodes = 10
-        for ep in range(episodes):
-            observations, _ = env.reset()
-            done = [False] * n_agents
-            episode_score = 0
-
-            while not any(done):
-                
-                actions = model.choose_action(observation=observations, explore=False)  
-                obs_, rewards, done, _ = env.step(actions)
-                episode_score += sum(rewards.values())
-                observations = obs_
-
-            print(f"Episode {ep + 1} - Total Score: {episode_score}")
-
-    env.close()
-
-
-
-
-# if __name__ == "__main__":
-#     os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-#     env = gym.make("pacman-v0", max_episode_steps = 10_000 , render_mode = "human" , mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 1,  maze_mode = RAND_MAZE ,  pac_pos_mode = RANDOM_PAC_POS )
-#     # print("Checking Environment")
-#     # check_env(env.unwrapped)
-#     # print("done checking environment")
-
-#     obs = env.reset()[0]
-#     done = False
-#     action = 4
-#     num_steps = 1
-#     while not done:
-#         # if num_steps == 10:
-#         #     break
-#         randaction = env.action_space.sample()
-#         env.render()
-#         obs, reward, terminated, _, _ = env.step(action)
-#         done = terminated 
-        
-#         # print("***************************************")
-#         # print(obs.shape)
-#         # print(obs[0][0])
-#         # print(obs[0][1])
-#         # print(obs[0][2])
-#         # print(obs[0][3])
-#         print(reward)
-#         # if action == 4:
-#         #     action = 0
-#         # elif action == 0:
-#         #     action = 4
-
-#         # num_steps +=1
-#         # if num_steps > 10:
-#         #     break
-#         # #print(env.game_score)
-#         # if action == 1 and reward == HIT_WALL_PENALITY:
-#         #     #print("*****************here")
-#         #     action = 2
-#         # elif reward == HIT_WALL_PENALITY:
-#         #     action = 1
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-   
-
-
-
-
+            if not evaluate:
+                if avg_score > best_score:
+                    maddpg_agents.save_checkpoint()
+                    best_score = avg_score
+            if i % PRINT_INTERVAL == 0 and i > 0:
+                print('episode', i, 'average score {:.1f}'.format(avg_score))
 
 
 
