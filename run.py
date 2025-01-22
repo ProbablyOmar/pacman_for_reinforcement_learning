@@ -429,7 +429,8 @@ class GameController(object):
             
             ## update pellet points each time you eat a new one
             self.pellets.updatePoints()
-            self.pellet_reward.value = pellet.points
+            if pellet.name == PELLET:
+                self.pellet_reward.value = pellet.points
 
             if self.pellets.numEaten == 30:
                 self.ghosts.inky.startNode.allowAccess(RIGHT, self.ghosts.inky)
@@ -502,38 +503,39 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
+    game = GameController(rlTraining=True , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=3 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
     done = False
     agent_direction=LEFT
-    step = 0
-    num_pellets_remaining = len(game.pellets.pelletList)
 
     while not done:
+        #agent_direction = random.randint(-2,2)
         game.update(render=True)
-        print("done: " ,  game.done)
-        print("num of pellets_remaining" , len(game.pellets.pelletList))
-        print(game.RLreward)
-        print(game.maze_map)
-        print("win: " , game.win)
-        print("***********************")
-        step+=1
         # g = {4 : "red: " , 5 : "pink: "}
         # for ghost in game.ghosts:
-        #     print(g[ghost.name] , ghost.direction , " " , game.maze_map[ghost.tile[1]][ghost.tile[0]]  , " ", ghost.direction == LEFT and game.pacman.tile[0] < ghost.tile[0])
-        if not game.done:
-            num_pellets_remaining = len(game.pellets.pelletList)
+        #     print(g[ghost.name] , ghost.direction , " " , game.maze_map[ghost.tile[1]][ghost.tile[0]]  , " ", ghost.direction == LEFT and game.pacman.tile[0] < ghost.tile[0])  
         done = game.done
+        print("num_pellets: " , len(game.pellets.pelletList))
+        print("done :" , done)
+        # print("pacman tile: " , game.pacman.tile)
+        # print("pacman direction: " , game.pacman.direction)
+        # print("done: " , done)
+        # print(game.maze_map)
+        print("*****************************")
         # print(done)
         #print(game.score)
         #print(len(game.pellets.pelletList))
         #print("step: " , game.episode_steps)
         #print("direction: ", game.pacman.direction)
-        # if game.pacman.tile == (6,23):
-        #     agent_direction = UP
-        # if game.pacman.tile == (6,5):
-        #     agent_direction = LEFT
-        
-        #print("*****************************")
+        if game.pacman.tile == (6,23):
+            agent_direction = UP
+        if game.pacman.tile == (6,1):
+            agent_direction = LEFT
+        if game.ghosts.blinky.tile == (2,1):
+            agent_direction = RIGHT
+        # print(game.maze_map)
+        # print(game.done)
+        #print(game.RLreward)
+        # print("*****************************")
         # if agent_direction == LEFT:
         #     agent_direction = RIGHT
         # elif agent_direction == RIGHT:
@@ -554,4 +556,5 @@ if __name__ == "__main__":
     # print ("done: " , game.done)
     # print("gameover: " , game.gameOver)
     # print("win: " , game.win)
-    print(num_pellets_remaining)
+    #print("score: " , game.score)
+

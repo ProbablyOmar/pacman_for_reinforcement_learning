@@ -1,0 +1,14 @@
+pacman:
+  replay_memory_size: 100000
+  mini_batch_size: 32
+  epsilon_init: 1
+  epsilon_decay: 0.99_9
+  epsilon_min: 0.05
+  network_sync_rate: 10
+  learning_rate_a: 0.0001
+  discount_factor_g: 0.99
+  stop_on_reward: 99999999
+  fc1_nodes: 512
+  enable_double_dqn: False
+  enable_dueling_dqn: False
+  cheat_prob : 0.5
