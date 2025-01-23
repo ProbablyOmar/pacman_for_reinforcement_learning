@@ -61,7 +61,7 @@ class GameController(object):
         self.gameOver = False
         self.win = False
         self.done = False
-        self.observation = None ###
+        # self.observation = None ###
         self.episode_steps = 0
         self.startGame()
 

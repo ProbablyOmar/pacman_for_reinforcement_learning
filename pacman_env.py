@@ -60,11 +60,15 @@ class PacmanEnv(ParallelEnv):
 
     @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
-        return spaces.Discrete(5, start=0)
+        return spaces.Discrete(5)
 
     def _getobs(self):
-        
-        self._maze_map = self.game.observation
+        #there is a problem in pacman observation returning none
+        # print("Pacman observation:", self.game.observation)
+        print("Pacman observation:" , self.game.maze_map)  
+        print("Pacman position:", self.game.pacman.position)  
+        # self._maze_map = self.game.observation
+        self._maze_map = self.game.maze_map
         self._maze_map = np.expand_dims(self._maze_map, axis=0)
         
         ghost_position = np.array([self.game.pacman.position.x, self.game.pacman.position.y])
@@ -80,11 +84,14 @@ class PacmanEnv(ParallelEnv):
     #     "ghost": self.game.pacman.position,
     #     "ghost_position": [ghost.position for ghost in self.game.ghosts]
     # }
+        print("Observations:", observations)
         return observations 
+    
     # , combined_state
 
     def reset(self, seed=None, options=None):
         self.agents = copy.copy(self.possible_agents)
+        print("Possible Agents",self.possible_agents)
         self.game.restartGame()
 
         observation = self._getobs()
@@ -97,12 +104,11 @@ class PacmanEnv(ParallelEnv):
         pacman_action = actions["pacman"]
         ghost_action = actions["ghost"]
     
-        pacman_action -= 2
         step_reward = TIME_PENALITY
         while True:
             if self.render_mode == "human":
                 self.game.update(
-                    agent_directions={"pacman": pacman_action, "ghost": ghost_action},
+                    agents_directions={"pacman": pacman_action, "ghost": ghost_action},
                     render=True,
                     # clocktick=self.metadata["render_fps"],
                 )
@@ -140,14 +146,14 @@ class PacmanEnv(ParallelEnv):
 
                 self.game_score += step_reward["pacman"]
 
-                if self.game.mode == SAFE_MODE:
-                    if reward == TIME_PENALITY or reward == HIT_WALL_PENALITY:
-                        self.useless_steps += 1
-                        if self.useless_steps >= MAX_USELESS_STEPS:
-                            self.game.done = True
-                            terminated = {a: self.game.done for a in self.agents}
-                            self.agents = []
-                            self.useless_steps = 0
+                # if self.game.mode == SAFE_MODE:
+                #     if reward == TIME_PENALITY or reward == HIT_WALL_PENALITY:
+                #         self.useless_steps += 1
+                #         if self.useless_steps >= MAX_USELESS_STEPS:
+                #             self.game.done = True
+                #             terminated = {a: self.game.done for a in self.agents}
+                #             self.agents = []
+                #             self.useless_steps = 0
                     # else:
                     #     self.useless_steps = 0
                 return observations, step_reward, terminated, truncated, info
@@ -185,10 +191,13 @@ if __name__ == "__main__":
 
     
     env = env_render
-    n_agents = 2  
-    actor_dims = [env.observation_space(agent).shape[0] for agent in env.possible_agents]  # Actor input dimensions
-    critic_dims = sum(actor_dims)  # Critic input dimensions "joint state"
-    n_actions = 5  
+    #n_agents = 2
+    # Instead of a list, use a dictionary for actor_dims
+    actor_dims = {agent: env.observation_space(agent).shape[0] for agent in env.possible_agents}
+
+    critic_dims = sum(actor_dims.values())  # Critic input dimensions "joint state"
+    n_actions = 5 
+    possible_agents = env.possible_agents 
 
     
     model_final_path = os.path.join(model_path, "MADDPG_model.pth")
@@ -199,17 +208,21 @@ if __name__ == "__main__":
         maddpg_agents = MADDPG(
             actor_dims,  # Actor; Takes individual states
             critic_dims,  # Critic; Takes joint states and joint actions 
-            n_agents,
-            n_actions,
+            n_agents=len(env.possible_agents),
+            n_actions=n_actions, 
+            possible_agents=env.possible_agents,
+            env=env,
             alpha=0.01,
             beta=0.01,
+            gamma=0.99,
+            tau=0.01,
             chkpt_dir=chkpt_dir,
             # tensorboard_log=log_path,
-            device='cuda'
-        )
+            device='cuda',
+            )
 
         
-        memory = MultiAgentReplayBuffer(1000000, critic_dims, actor_dims, n_agents, n_actions, batch_size=1024)
+        memory = MultiAgentReplayBuffer(1000000, critic_dims, actor_dims, possible_agents, n_actions, batch_size=1024)
 
         total_episodes = 5000
         MAX_STEP = 25
@@ -225,7 +238,7 @@ if __name__ == "__main__":
         
         for episode in range(total_episodes):
             obs, _ = env.reset()  
-            done = [False] * n_agents  
+            done = [False] * len(possible_agents) 
             episode_step = 0
 
             while not any(done):
@@ -233,7 +246,9 @@ if __name__ == "__main__":
                     env.render()
                 # Chooses actions for each agent based on their individual states
                 # ##### Actor
-                actions =  maddpg_agents.choose_action(obs) 
+                actions = {}
+                for agent in env.possible_agents:
+                    actions[agent] = maddpg_agents.choose_action(obs) 
                 obs_, rewards, done, _ = env.step(actions)
                 
                 # actions = {agent: actions[i] for i, agent in enumerate(env.possible_agents)}  

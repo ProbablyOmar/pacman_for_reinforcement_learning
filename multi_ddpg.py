@@ -101,15 +101,18 @@ class Agent:
         
         
 class MADDPG:
-    def __init__(self, actor_dims, critic_dims, n_agents, n_actions, alpha=0.01 , beta=0.01, gamma=0.99 , tau=0.01 , tensorboard_log=None , chkpt_dir="tmp/maddpg/" , device= 'cuda'):    
+    def __init__(self, actor_dims, critic_dims, n_agents, n_actions, possible_agents, env, alpha=0.01, beta=0.01, gamma=0.99, tau=0.01, tensorboard_log=None, chkpt_dir="tmp/maddpg/", device='cuda'):
         self.agents = []
+        self.env = env
+        self.possible_agents = possible_agents
         self.n_agents = n_agents
         self.n_actions = n_actions
         
         
-        for agent_id in range(self.n_agents):
-            self.agents.append(Agent(actor_dims[agent_id], critic_dims, n_actions, agent_id, alpha=alpha , beta=beta , chkpt_dir=chkpt_dir))   
-
+        for agent_name in self.possible_agents:  # Iterate over agent names
+            agent_id = self.possible_agents.index(agent_name)  # Find the index of the agent
+            self.agents.append(Agent(actor_dims[agent_name], critic_dims, n_actions, agent_id, alpha=alpha, beta=beta, chkpt_dir=chkpt_dir))   
+            
     def save_checkpoint(self):
         for agent in self.agents:
             agent.save_models()
@@ -126,21 +129,35 @@ class MADDPG:
     #         actions.append(action)
     #     return actions
     
-    def choose_action(self, raw_obs):
+    def choose_action(self, raw_obs, noise_scale=0.1):
         """
-        Each agent chooses its action based on its observation.
-        Args:
-            raw_obs (list): List of observations for all agents.
-        Returns:
-            list: List of actions chosen by each agent.
-        """
-        actions = []
-        for i, agent in enumerate(self.agents):
-            action = agent.choose_action(raw_obs[i])
-            actions.append(action)
+        Choose actions for all possible agents based on their respective observations.
+        
+        Parameters:
+        - raw_obs (dict): A dictionary containing observations for all possible agents
+                        with keys corresponding to agent names (e.g., 'pacman', 'ghost').
+        - noise_scale (float): The scale of the noise to be added for exploration.
 
+        Returns:
+        - actions (dict): A dictionary containing actions for all agents.
+        """
+        actions = {}
+        
+        for agent in zip(self.possible_agents, self.agents):
+            if agent in raw_obs:
+                observation = raw_obs[agent]
+                # state = T.tensor([observation], dtype=T.float).to(agent.actor.device)
+                state = T.tensor([observation.x, observation.y], dtype=T.float)
+                print(state)
+                action = agent.actor.forward(state)
+                noise = T.normal(mean=0, std=noise_scale, size=action.shape).to(agent.actor.device)
+                action = action + noise
+                action = T.clamp(action, -1, 1)  # Clip action to valid bounds
+                actions[agent] = action.detach().cpu().numpy()[0]
+        
         return actions
 
+        
 
     def learn(self, memory):
         if not memory.ready():
@@ -159,18 +176,19 @@ class MADDPG:
         all_agents_new_actions = []
         all_agents_new_mu_actions = []
         old_agents_actions = []
-        
-        
-        for i, agent in enumerate(self.agents):
-            new_states = T.tensor(actor_new_states[i], dtype=T.float).unsqueeze(1).to(device)
-            new_pi = agent.target_actor.forward(new_states)
-            all_agents_new_mu_actions.append(new_pi)
 
-            mu_states = T.tensor(actor_states[i], dtype=T.float).unsqueeze(1).to(device)
-            pi = agent.actor.forward(mu_states)
-            all_agents_new_actions.append(pi)
+        for agent_name, agent in zip(self.possible_agents, self.agents):
+            if agent_name in actor_new_states:
+                new_states = T.tensor(actor_new_states[agent_name], dtype=T.float).unsqueeze(1).to(device)
+                new_pi = agent.target_actor.forward(new_states)
+                all_agents_new_mu_actions.append(new_pi)
 
-            old_agents_actions.append(actions[i].unsqueeze(1))
+                mu_states = T.tensor(actor_states[agent_name], dtype=T.float).unsqueeze(1).to(device)
+                pi = agent.actor.forward(mu_states)
+                all_agents_new_actions.append(pi)
+
+                old_agents_actions.append(actions[agent_name].unsqueeze(1))
+
 
             
         new_actions = T.cat([acts for acts in all_agents_new_actions], dim=1)

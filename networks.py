@@ -119,7 +119,7 @@ class ActorNetwork(nn.Module):
         state = state.view(state.size(0), -1)  # Flatten the state input
         x = self.relu(self.fc1(state))
         x = self.relu(self.fc2(x))
-        actions = self.softmax(self.fc3(x))  
+        actions = F.softmax(self.fc3(x), dim=-1) 
         return actions
     
     

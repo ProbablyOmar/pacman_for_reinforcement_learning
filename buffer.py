@@ -1,92 +1,79 @@
 import os
 import numpy as np
 import torch as T
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 import random
-from collections import deque
 
 class MultiAgentReplayBuffer:
-    def __init__(self, max_size, critic_dims, actor_dims, n_agents, n_actions, batch_size):
+    def __init__(self, max_size, critic_dims, actor_dims, possible_agents, n_actions, batch_size):
         self.mem_size = max_size
         self.mem_cntr = 0
-        self.n_agents = n_agents
         self.batch_size = batch_size
         self.n_actions = n_actions
         self.actor_dims = actor_dims
         self.critic_dims = critic_dims
         
+        # Ensure possible_agents is a list of agent names (e.g., ["pacman", "ghost"])
+        if isinstance(possible_agents, int):
+            # Generate agent names like "agent0", "agent1", ...
+            self.possible_agents = [f"agent{i}" for i in range(possible_agents)]
+        else:
+            self.possible_agents = possible_agents
+
+        # Create memory buffers for each agent
         self.state_memory = np.zeros((self.mem_size, critic_dims))
         self.new_state_memory = np.zeros((self.mem_size, critic_dims))
-        self.reward_memory = np.zeros((self.mem_size, n_agents))
-        self.terminal_memory = np.zeros((self.mem_size, n_agents), dtype=bool)
+        self.reward_memory = {agent: np.zeros(self.mem_size) for agent in self.possible_agents}
+        self.terminal_memory = {agent: np.zeros(self.mem_size, dtype=bool) for agent in self.possible_agents}
         
-        self.init_actor_memory(actor_dims)
-    
-    
-    def init_actor_memory(self, actor_dims):
-        
-        # Actor memory // local states,and actions
-        self.actor_state_memory = []
-        self.actor_new_state_memory = []
-        self.actor_action_memory = []
-    
-        for i in range(self.n_agents):
-            self.actor_state_memory.append(
-                            np.zeros((self.mem_size, self.actor_dims[i])))
-            self.actor_new_state_memory.append(
-                            np.zeros((self.mem_size, self.actor_dims[i])))
-            self.actor_action_memory.append(
-                            np.zeros((self.mem_size, self.n_actions)))
+        self.actor_state_memory = {agent: np.zeros((self.mem_size, actor_dims[agent])) for agent in self.possible_agents}
+        self.actor_new_state_memory = {agent: np.zeros((self.mem_size, actor_dims[agent])) for agent in self.possible_agents}
+        self.actor_action_memory = {agent: np.zeros((self.mem_size, n_actions)) for agent in self.possible_agents}
+
 
     def store_transition(self, raw_obs, state, action, reward, raw_obs_, state_, done):
         """
         Store transitions into replay memory.
-        :param raw_obs: List of current observations for all agents (local for actors).
+        :param raw_obs: Dict of current observations for all agents (local for actors).
         :param state: Centralized joint state for the critic.
-        :param action: List of actions taken by each agent.
-        :param reward: List of rewards received by each agent.
-        :param raw_obs_: List of next observations for all agents (local for actors).
+        :param action: Dict of actions taken by each agent.
+        :param reward: Dict of rewards received by each agent.
+        :param raw_obs_: Dict of next observations for all agents (local for actors).
         :param state_: Centralized next joint state for the critic.
-        :param done: List of terminal flags for each agent.
+        :param done: Dict of terminal flags for each agent.
         """
-        
         index = self.mem_cntr % self.mem_size
-        #actor memory
-        for agent in range(self.n_agents):
+        
+        for agent in self.possible_agents:
             self.actor_state_memory[agent][index] = raw_obs[agent]
             self.actor_new_state_memory[agent][index] = raw_obs_[agent]
             self.actor_action_memory[agent][index] = action[agent]
+            self.reward_memory[agent][index] = reward[agent]
+            self.terminal_memory[agent][index] = done[agent]
 
-        #critic memory
         self.state_memory[index] = state
         self.new_state_memory[index] = state_
-        self.reward_memory[index] = reward
-        self.terminal_memory[index] = done
         self.mem_cntr += 1
 
     def sample_buffer(self):
+        """
+        Sample a batch of experiences from the replay buffer.
+        """
         max_mem = min(self.mem_cntr, self.mem_size)
         batch = np.random.choice(max_mem, self.batch_size, replace=False)
 
-        
         states = self.state_memory[batch]
         new_states = self.new_state_memory[batch]
-        rewards = self.reward_memory[batch]
-        dones = self.terminal_memory[batch]
+        rewards = {agent: self.reward_memory[agent][batch] for agent in self.possible_agents}
+        dones = {agent: self.terminal_memory[agent][batch] for agent in self.possible_agents}
         
-        #states and action for actor
-        actor_states = []
-        actor_new_states = []
-        actions = []
-        for agent in range(self.n_agents):
-            actor_states.append(self.actor_state_memory[agent][batch])
-            actor_new_states.append(self.actor_new_state_memory[agent][batch])
-            actions.append(self.actor_action_memory[agent][batch])
+        actor_states = {agent: self.actor_state_memory[agent][batch] for agent in self.possible_agents}
+        actor_new_states = {agent: self.actor_new_state_memory[agent][batch] for agent in self.possible_agents}
+        actions = {agent: self.actor_action_memory[agent][batch] for agent in self.possible_agents}
 
-        return actor_states, states, actions, rewards, actor_new_states, states_, terminal
+        return actor_states, states, actions, rewards, actor_new_states, new_states, dones
 
     def ready(self):
-        if self.mem_cntr >= self.batch_size:
-            return True
+        """
+        Check if the replay buffer has enough samples for training.
+        """
+        return self.mem_cntr >= self.batch_size
