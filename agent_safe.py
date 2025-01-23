@@ -303,7 +303,7 @@ if __name__ == '__main__':
 
     #dql = Agent(hyperparameter_set=args.hyperparameters)
     dql = Agent("pacman")
-    dql.run(is_training=True, render=True)
+    dql.run(is_training=True, render=False)
     # if args.train:
     #     dql.run(is_training=True)
     # else:
