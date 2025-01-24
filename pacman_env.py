@@ -38,7 +38,7 @@ class PacmanEnv(ParallelEnv):
         self.game = GameController(rlTraining=True)
         self.game_score = 0
         self.useless_steps = 0
-        self.possible_agents = ["pacman", "ghost"]
+        self.possible_agents = ["pacman", "ghost1"]
 
         self._maze_map = np.zeros(shape=(GAME_ROWS, GAME_COLS), dtype=np.int_)
         self._last_obs = np.zeros(shape=(GAME_ROWS, GAME_COLS), dtype=np.int_)
@@ -55,7 +55,7 @@ class PacmanEnv(ParallelEnv):
             return spaces.Box(
                 low=0, high=13, shape=(1, GAME_ROWS, GAME_COLS), dtype=np.int_
             )
-        elif agent == "ghost":
+        elif agent == "ghost1":
             return spaces.Box(0, np.array([SCREENWIDTH, SCREENHEIGHT]), dtype=int)
 
     @functools.lru_cache(maxsize=None)
@@ -75,7 +75,7 @@ class PacmanEnv(ParallelEnv):
         
         observations = {
             "pacman": self._maze_map,              
-            "ghost": self.game.pacman.position     
+            "ghost1": self.game.pacman.position     
             }
 
     #     #global state for the critic network
@@ -95,26 +95,26 @@ class PacmanEnv(ParallelEnv):
         self.game.restartGame()
 
         observation = self._getobs()
-        info = {"pacman": {}, "ghost": {}}
+        info = {"pacman": {}, "ghost1": {}}
         
         return observation, info
 
     def step(self, actions):
         
         pacman_action = actions["pacman"]
-        ghost_action = actions["ghost"]
+        ghost_action = actions["ghost1"]
     
         step_reward = TIME_PENALITY
         while True:
             if self.render_mode == "human":
                 self.game.update(
-                    agents_directions={"pacman": pacman_action, "ghost": ghost_action},
+                    agents_directions={"pacman": pacman_action, "ghost1": ghost_action},
                     render=True,
                     # clocktick=self.metadata["render_fps"],
                 )
             else:
                 self.game.update(
-                    agents_directions={"pacman": pacman_action, "ghost": ghost_action},
+                    agents_directions={"pacman": pacman_action, "ghost1": ghost_action},
                     render=False,
                     # clocktick=self.metadata["render_fps"],
                 )
@@ -134,7 +134,7 @@ class PacmanEnv(ParallelEnv):
             
             terminated = {a: self.game.done for a in self.agents}
             truncated = {a: False for a in self.agents}
-            reward = {"pacman": self.game.RLreward, "ghost": ghostReward}
+            reward = {"pacman": self.game.RLreward, "ghost1": ghostReward}
             observations = self._getobs()
             info = {a: {} for a in self.agents}
 
