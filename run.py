@@ -212,7 +212,7 @@ class GameController(object):
         #########################
         ## get the directions of the agents
         pacman_direction = agents_directions["pacman"]
-        ghosts_directions = agents_directions["ghost1"]
+        ghosts_directions = agents_directions["ghosts"]
 
         self.episode_steps += 1
         # print(agent_direction)
@@ -510,7 +510,7 @@ if __name__ == "__main__":
     game = GameController(rlTraining=True , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
     done = False
     agent_direction=LEFT
-    agents_directions = {"pacman" : LEFT , "ghost1" : [LEFT , None , None , None]}
+    agents_directions = {"pacman" : LEFT , "ghosts" : [LEFT , None , None , None]}
     while not done:
         
         game.update(render=True , agents_directions = agents_directions)
@@ -526,9 +526,9 @@ if __name__ == "__main__":
         if game.pacman.tile == (6,5):
             agents_directions["pacman"] = LEFT
         if game.ghosts.blinky.tile == (9,11):
-            agents_directions["ghost1"][0] = DOWN
+            agents_directions["ghosts"][0] = DOWN
         if game.ghosts.blinky.tile == (9,13):
-            agents_directions["ghost1"][0] = LEFT
+            agents_directions["ghosts"][0] = LEFT
         # g = {4 : "red: " , 5 : "pink: "}
         # for ghost in game.ghosts:
         #     print(g[ghost.name] , ghost.direction , " " , game.maze_map[ghost.tile[1]][ghost.tile[0]]  , " ", ghost.direction == LEFT and game.pacman.tile[0] < ghost.tile[0])
