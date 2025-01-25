@@ -38,7 +38,7 @@ class PacmanEnv(ParallelEnv):
         self.game = GameController(rlTraining=True)
         self.game_score = 0
         self.useless_steps = 0
-        self.possible_agents = ["pacman", "ghost"]
+        self.possible_agents = ["pacman", "ghosts"]
 
         self._maze_map = np.zeros(shape=(GAME_ROWS, GAME_COLS), dtype=np.int_)
         self._last_obs = np.zeros(shape=(GAME_ROWS, GAME_COLS), dtype=np.int_)
@@ -71,11 +71,11 @@ class PacmanEnv(ParallelEnv):
         self._maze_map = self.game.maze_map
         self._maze_map = np.expand_dims(self._maze_map, axis=0)
         
-        ghost_position = np.array([self.game.pacman.position.x, self.game.pacman.position.y])
-        
+        # ghost_positions = [np.array([ghost.position.x, ghost.position.y]) for ghost in self.game.ghosts]
+        ghost_positions = [np.array([ghost.position.x, ghost.position.y]) for ghost in self.game.ghosts]
         observations = {
             "pacman": self._maze_map,              
-            "ghosts": self.game.pacman.position     
+            "ghosts": ghost_positions   
             }
 
     #     #global state for the critic network
@@ -103,7 +103,28 @@ class PacmanEnv(ParallelEnv):
         
         pacman_action = actions["pacman"]
         ghost_action = actions["ghosts"]
-    
+        
+        if self.game.move_mode == CONT_STEPS_MODE:
+            if pacman_action == 0:
+                pacman_action = RIGHT
+            elif pacman_action == 1:
+                pacman_action = DOWN
+            elif pacman_action == 2:
+                pacman_action = UP
+            elif pacman_action == 3:
+                pacman_action = LEFT
+        
+        # Ghost actions
+        for i, ghost_action in enumerate(ghost_action):
+            if ghost_action == 0:
+                ghost_action = RIGHT
+            elif ghost_action == 1:
+                ghost_action = DOWN
+            elif ghost_action == 2:
+                ghost_action = UP
+            elif ghost_action == 3:
+                ghost_action = LEFT
+            
         step_reward = TIME_PENALITY
         while True:
             if self.render_mode == "human":
@@ -120,7 +141,7 @@ class PacmanEnv(ParallelEnv):
                 )
                 
             pacman_position = self.game.pacman.position
-            ghost_position = self.game.ghosts[0].position
+            ghost_position = self.game.ghost[0].position
             distance = math.hypot(pacman_position.x - ghost_position.x, pacman_position.y - ghost_position.y)
             
             ghostReward = (
@@ -157,6 +178,60 @@ class PacmanEnv(ParallelEnv):
                     # else:
                     #     self.useless_steps = 0
                 return observations, step_reward, terminated, truncated, info
+            
+            
+        if self.game.move_mode == DISCRETE_STEPS_MODE:
+            if pacman_action == 0:
+                pacman_action = RIGHT
+            elif pacman_action == 1:
+                pacman_action = DOWN
+            elif pacman_action == 2:
+                pacman_action = UP
+            elif pacman_action == 3:
+                pacman_action = LEFT
+        
+        # Ghost actions
+        for i, ghost_action in enumerate(ghost_action):
+            if ghost_action == 0:
+                ghost_action = RIGHT
+            elif ghost_action == 1:
+                ghost_action = DOWN
+            elif ghost_action == 2:
+                ghost_action = UP
+            elif ghost_action == 3:
+                ghost_action = LEFT
+                
+                
+            if self.render_mode == "human":
+                self.game.update(
+                    agents_directions={"pacman": pacman_action, "ghosts": ghost_action},
+                    render=True,
+                    # clocktick=self.metadata["render_fps"],
+                )
+            else:
+                self.game.update(
+                    agents_directions={"pacman": pacman_action, "ghosts": ghost_action},
+                    render=False,
+                    # clocktick=self.metadata["render_fps"],
+                )
+                
+                
+            self.num_pellets_last = len(self.game.pellets.pelletList)
+            terminated = {a: self.game.done for a in self.agents}
+            truncated = {a: False for a in self.agents}
+            reward = {"pacman": self.game.RLreward, "ghosts": ghostReward}
+            observation = self._getobs()
+            info = {a: {} for a in self.agents}
+            
+            if reward != TIME_PENALITY:
+                step_reward = reward
+
+            if not np.array_equal(observations["pacman"], self._last_obs):
+                np.copyto(self._last_obs, np.array(observations["pacman"], dtype=np.int32)) ###
+
+                self.game_score += step_reward["pacman"]
+            
+            return observation, reward, terminated, truncated, info
 
     def render(self):
         if self.render_mode == "human":
@@ -177,6 +252,7 @@ def obs_list_to_state_vector(observation):
 
 if __name__ == "__main__":
     
+
     env_not_render = PacmanEnv(render_mode=None)
     env_render = PacmanEnv(render_mode="human")
 
@@ -190,21 +266,47 @@ if __name__ == "__main__":
     os.makedirs(chkpt_dir, exist_ok=True)
 
     
-    env = env_render
+    env = env_not_render
     #n_agents = 2
-    # Instead of a list, use a dictionary for actor_dims
-    actor_dims = {agent: env.observation_space(agent).shape[0] for agent in env.possible_agents}
-
-    critic_dims = sum(actor_dims.values())  # Critic input dimensions "joint state"
-    n_actions = 5 
     possible_agents = env.possible_agents 
+    
+    
+    actor_dims = []
+    for agent in env.possible_agents:
+        if agent == "pacman":
+            actor_dims.append(np.prod(env.observation_space(agent).shape))  # Flattening the observation space
+        elif agent == "ghosts":
+            actor_dims.append(np.prod(env.observation_space(agent).shape))  # Flattening the observation space
+            
+    joint_state_dim = sum(actor_dims)  # Sum of state dimensions for all agents
+    joint_action_dim = sum([env.action_space(agent).n for agent in env.possible_agents])  # Sum of action dimensions for all agents
+
+    critic_dims = [joint_state_dim, joint_action_dim]
 
     
+    
+    n_actions = 5 
+    # Debugging output
+    
+    print("Possible agents:", possible_agents)
+    print("Actor dimensions:", actor_dims)
+    print("Critic dimensions:", critic_dims)
+    
+
     model_final_path = os.path.join(model_path, "MADDPG_model.pth")
     if not os.path.exists(model_final_path):
         print("Training new MADDPG model...")
 
-        
+        actor_dims = {
+            'pacman': 2,   # Pacman's state space has 2 features (x, y)
+            'ghosts': 3,    # Ghost's state space has 3 features (x, y, distance_to_pacman)
+        }
+
+        critic_dims = {
+            'pacman': 5,   # Combined state space of Pacman and Ghost (2 + 3)
+            'ghosts': 5,    # Combined state space of Pacman and Ghost (2 + 3)
+        }
+
         maddpg_agents = MADDPG(
             actor_dims,  # Actor; Takes individual states
             critic_dims,  # Critic; Takes joint states and joint actions 
@@ -285,6 +387,9 @@ if __name__ == "__main__":
                     best_score = avg_score
             if i % PRINT_INTERVAL == 0 and i > 0:
                 print('episode', i, 'average score {:.1f}'.format(avg_score))
+                
+                
+        env.close()
 
 
 

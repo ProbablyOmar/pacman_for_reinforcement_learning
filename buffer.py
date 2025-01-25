@@ -10,7 +10,7 @@ class MultiAgentReplayBuffer:
         self.batch_size = batch_size
         self.n_actions = n_actions
         self.actor_dims = actor_dims
-        self.critic_dims = critic_dims
+        self.critic_dims = sum(critic_dims.values())  # Combine all critic dimensions
         
         # Ensure possible_agents is a list of agent names (e.g., ["pacman", "ghost"])
         if isinstance(possible_agents, int):
@@ -20,8 +20,8 @@ class MultiAgentReplayBuffer:
             self.possible_agents = possible_agents
 
         # Create memory buffers for each agent
-        self.state_memory = np.zeros((self.mem_size, critic_dims))
-        self.new_state_memory = np.zeros((self.mem_size, critic_dims))
+        self.state_memory = np.zeros((self.mem_size, self.critic_dims))  # Use combined critic_dims
+        self.new_state_memory = np.zeros((self.mem_size, self.critic_dims))  # Use combined critic_dims
         self.reward_memory = {agent: np.zeros(self.mem_size) for agent in self.possible_agents}
         self.terminal_memory = {agent: np.zeros(self.mem_size, dtype=bool) for agent in self.possible_agents}
         

@@ -109,9 +109,9 @@ class MADDPG:
         self.n_actions = n_actions
         
         
-        for agent_name in self.possible_agents:  # Iterate over agent names
-            agent_id = self.possible_agents.index(agent_name)  # Find the index of the agent
-            self.agents.append(Agent(actor_dims[agent_name], critic_dims, n_actions, agent_id, alpha=alpha, beta=beta, chkpt_dir=chkpt_dir))   
+        for agent in self.possible_agents:  # Iterate over agent names
+            agent_id = self.possible_agents.index(agent)  # Find the index of the agent
+            self.agents.append(Agent(actor_dims[agent], critic_dims, n_actions, agent_id, alpha=alpha, beta=beta, chkpt_dir=chkpt_dir))   
             
     def save_checkpoint(self):
         for agent in self.agents:
