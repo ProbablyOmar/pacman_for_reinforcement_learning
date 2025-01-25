@@ -105,7 +105,7 @@ class Agent():
             best_reward = -9999999  # Track best reward
         else:
             policy_dqn.load_state_dict(torch.load(self.MODEL_FILE))    # Load learned policy   
-            policy_dqn.eval()    # switch model to evaluation mode
+            #policy_dqn.eval()    # switch model to evaluation mode
 
         # Train INDEFINITELY, manually stop the run when you are satisfied (or unsatisfied) with the results
         for episode in itertools.count():
@@ -113,7 +113,7 @@ class Agent():
             cheat_obs = get_observation(env)
 
             state = torch.tensor(state, dtype=torch.float, device=device) # Convert state to tensor directly on device
-
+            prev_action = STOP
             terminated = False      # True when agent reaches goal or fails
             episode_reward = 0.0    # Used to accumulate rewards per episode
             episode_length = 0
@@ -135,18 +135,33 @@ class Agent():
                     action = torch.tensor(action, dtype=torch.int64, device=device)
 
                 else:            ### exploitation # select best action
-                    with torch.no_grad():
+                    with torch.no_grad(): 
+                        #print(state)                            
                         actions = policy_dqn(state.unsqueeze(dim=0)).squeeze()
+                        #print("actions: " , actions)
                         best_q = torch.tensor(float("-inf"), dtype=torch.float, device=device)
                         best_action = torch.tensor(0, dtype=torch.int64, device=device)
 
                         for action , q_value in enumerate(actions):
-                            if q_value.item() > best_q.item() and cheat_obs[action] == 0:  #there is no wall and this is the biggest q value so far
+                            if q_value.item() > best_q.item() and cheat_obs[action] == 0 :  #there is no wall and this is the biggest q value so far
                                 best_q.fill_(q_value.item())
                                 best_action.fill_(action)
                         action = torch.tensor(best_action.item(), dtype=torch.int64, device=device)
                         action.fill_(get_direction_value(action.item()))
-                # Execute action. Truncated and info is not used.
+                        #print("action: " ,  action)
+                # Execute action.
+                if action.item() == -prev_action:
+                    print("entered a loop ******************")
+                    print(action , prev_action)
+                    action = torch.tensor(cheat_obs[4], dtype=torch.int64, device=device)
+                    # for i in range(4):
+                    #     if cheat_obs[i] == 0 :
+                    #         action = torch.tensor(i, dtype=torch.int64, device=device)
+                    #         action.fill_(get_direction_value(action.item()))
+                    #         print("action i choosed randomly: " , action.item())
+                    #         break
+
+                prev_action = action.item()
                 env.update(agent_direction = action.item() , render=render)
                 action.fill_(get_direction_idx(action.item()))
 
@@ -178,7 +193,10 @@ class Agent():
 
             env.update(agent_direction = STOP , render=render)  ## make another update after fininshing the episode to restart 
             ############# Here we finished the episode
-            print(f"finished episode with reward: {episode_reward} and episode length: {episode_length} , epsilon = {epsilon}")
+            if is_training:
+                print(f"finished episode with reward: {episode_reward} and episode length: {episode_length} , epsilon = {epsilon}")
+            else:
+                print(f"finished episode with reward: {episode_reward} and episode length: {episode_length}")
             # Keep track of the rewards collected per episode.
             rewards_per_episode.append(episode_reward)
             episodes_lengths.append(episode_length)
@@ -303,8 +321,8 @@ if __name__ == '__main__':
 
     #dql = Agent(hyperparameter_set=args.hyperparameters)
     dql = Agent("pacman")
-    dql.run(is_training=True, render=False)
+    dql.run(is_training=False, render=True)
     # if args.train:
     #     dql.run(is_training=True)
     # else:
-    #     dql.run(is_training=False, render=False)
+    #     dql.run(is_training=False, render=True)

@@ -432,7 +432,9 @@ def get_observation (game):
                     direction_closest_pellet_escape_ghosts[1] = direction_pellet
         prefered_dir = direction_closest_pellet_escape_ghosts[1]
 
-        #print("prefered_direction_closest_pellet: ",prefered_dir)
+        # if prefered_dir == STOP:
+        #     print("direction to closest pellet: " , direction_closest_pellet_escape_ghosts)
+        # #print("prefered_direction_closest_pellet: ",prefered_dir)
 
     #prefered_dir = get_direction_idx(prefered_dir)
     observation[4] = prefered_dir
@@ -522,7 +524,7 @@ def smart_observation (game):
 
      # get the direction to the closest power pellet with distance <= 8
     direction_closest_pp = [8 , STOP]   #first idx is for the distance and second idx is the direction
-
+    
     for pellet in game.pellets.pelletList:
         if pellet.name == POWERPELLET:
             direction_pellet , path_length_pellet , _ = a_star(game.maze_map , game.pacman.tile , pellet.tile)
@@ -536,7 +538,7 @@ def smart_observation (game):
 
 
 
-# game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
+# game = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=MAZE1 , pac_pos_mode=RANDOM_PAC_POS)
 
 # direc , path_length , path = a_star(game.maze_map , game.pacman.tile , (1,1))
 

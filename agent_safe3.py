@@ -24,21 +24,22 @@ import os
 DATE_FORMAT = "%m-%d %H:%M:%S"
 
 # Directory for saving run info
-RUNS_DIR = "runs_normal"
+RUNS_DIR = "runs_safe3"
 RUNS_DIR_LOAD = "runs_safe2"
+
 os.makedirs(RUNS_DIR, exist_ok=True)
 
 # 'Agg': used to generate plots as images and save them to a file instead of rendering to screen
 matplotlib.use('Agg')
 
-#device = 'cuda'
-device = 'cpu' # force cpu, sometimes GPU not always faster than CPU due to overhead of moving data to GPU
+device = 'cuda'
+#device = 'cpu' # force cpu, sometimes GPU not always faster than CPU due to overhead of moving data to GPU
 
 # Deep Q-Learning Agent
 class Agent():
 
     def __init__(self, hyperparameter_set):
-        with open('hyperparameters_normal.yml', 'r') as file:
+        with open('hyperparameters3.yml', 'r') as file:
             all_hyperparameter_sets = yaml.safe_load(file)
             hyperparameters = all_hyperparameter_sets[hyperparameter_set]
             # print(hyperparameters)
@@ -67,6 +68,7 @@ class Agent():
         self.LOG_FILE   = os.path.join(RUNS_DIR, f'{self.hyperparameter_set}.log')
         self.MODEL_FILE = os.path.join(RUNS_DIR, f'{self.hyperparameter_set}.pt')
         self.GRAPH_FILE = os.path.join(RUNS_DIR, f'{self.hyperparameter_set}.png')
+
         self.LOAD_MODEL_FILE = os.path.join(RUNS_DIR_LOAD, f'{self.hyperparameter_set}.pt')
 
     def run(self, is_training=True, render=False):
@@ -81,7 +83,7 @@ class Agent():
 
         # Create instance of the environment.
         # Use "**self.env_make_params" to pass in environment-specific parameters from hyperparameters.yml.
-        env = GameController(rlTraining=True , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 0 , pacman_lives=3 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
+        env = GameController(rlTraining=True , mode = SAFE_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 0 , pacman_lives=1 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
         state = smart_observation(env)
         # Number of possible actions and state shape
         num_actions = 4
@@ -89,8 +91,7 @@ class Agent():
 
         # List to keep track of rewards collected per episode.
         rewards_per_episode = []
-        num_pellets_remaining = []
-        num_wins = []
+        episodes_lengths = []
 
         # Create policy and target network. Number of nodes in the hidden layer can be adjusted.
         policy_dqn = DQN(num_states, num_actions, self.fc1_nodes, self.enable_dueling_dqn).to(device)
@@ -99,7 +100,7 @@ class Agent():
             epsilon = self.epsilon_init   # Initialize epsilon
             memory = ReplayMemory(self.replay_memory_size)  # Initialize replay memory
 
-            policy_dqn.load_state_dict(torch.load(self.LOAD_MODEL_FILE))
+            policy_dqn.load_state_dict(torch.load(self.LOAD_MODEL_FILE))    # Load learned policy 
             target_dqn = DQN(num_states, num_actions, self.fc1_nodes, self.enable_dueling_dqn).to(device)  # Create the target network and make it identical to the policy network
             target_dqn.load_state_dict(policy_dqn.state_dict())
 
@@ -117,10 +118,12 @@ class Agent():
             cheat_obs = get_observation(env)
 
             state = torch.tensor(state, dtype=torch.float, device=device) # Convert state to tensor directly on device
+            prev_action = STOP
+            looping_count = 0
 
             terminated = False      # True when agent reaches goal or fails
             episode_reward = 0.0    # Used to accumulate rewards per episode
-
+            episode_length = 0
             # Perform actions until episode terminates or reaches max rewards
             # (on some envs, it is possible for the agent to train to a point where it NEVER terminates, so stop on reward is necessary)
             while(not terminated and episode_reward < self.stop_on_reward):  ## episode starts
@@ -138,9 +141,11 @@ class Agent():
                         action = random.choice(possible_actions) # Exploration
                     action = torch.tensor(action, dtype=torch.int64, device=device)
 
-                else:            ### exploitation # select best action
-                    with torch.no_grad():
+                else:            ### exploitation # select best action  (in this code we always exploit: 0.05 explore)
+                    with torch.no_grad(): 
+                        print("pacman tile : " , env.pacman.tile)                            
                         actions = policy_dqn(state.unsqueeze(dim=0)).squeeze()
+                        print("actions: " , actions)
                         best_q = torch.tensor(float("-inf"), dtype=torch.float, device=device)
                         best_action = torch.tensor(0, dtype=torch.int64, device=device)
 
@@ -150,22 +155,37 @@ class Agent():
                                 best_action.fill_(action)
                         action = torch.tensor(best_action.item(), dtype=torch.int64, device=device)
                         action.fill_(get_direction_value(action.item()))
+
+                        ##if you are going to enter a loop then check which time is it to loop and pick the better direction
+                        if action.item() == -prev_action and looping_count >= 2:
+                            action = torch.tensor(cheat_obs[4], dtype=torch.int64, device=device)    
+
+                        #print("action: " ,  action)
                 # Execute action. Truncated and info is not used.
-                env.update(agent_direction = action.item() , render = render)
-                action.fill_(get_direction_idx(action.item()))
+                env.update(agent_direction = action.item() , render=render)
 
                 new_state = smart_observation(env)
                 new_cheat_obs = get_observation(env)
                 reward = env.RLreward
                 terminated = env.done
 
-                # Accumulate rewards
+                ##if the action will make the agent enter a loop penalize this action
+                if action.item() == -prev_action:
+                    if looping_count %2 == 0:
+                        reward += -0.25
+                    looping_count += 1
+                else:
+                    looping_count = 0
+
+                prev_action = action.item()
                 episode_reward += reward
+                episode_length += 1
 
                 # Convert new state and reward to tensors on device
                 new_state = torch.tensor(new_state, dtype=torch.float, device=device)
                 reward = torch.tensor(reward, dtype=torch.float, device=device)
 
+                action.fill_(get_direction_idx(action.item()))  ## encode the action again before putting it in the replay buffer
                 if is_training:                   
                     memory.append((state, action, new_state, reward, terminated))  # Save experience into memory       
                     step_count+=1   # Increment step counter
@@ -174,17 +194,20 @@ class Agent():
                 state = new_state
                 cheat_obs = new_cheat_obs
 
-            ############# Here we finished the episode 
-            print(f"finished episode with reward: {episode_reward} and won = {env.win}")
+            env.update(agent_direction = STOP , render=render)  ## make another update after fininshing the episode to restart 
+            ############# Here we finished the episode
+            if is_training:
+                print(f"finished episode {episode} with reward: {episode_reward} and episode length: {episode_length} , epsilon = {epsilon}")
+            else:
+                print(f"finished episode {episode} with reward: {episode_reward} and episode length: {episode_length}")
             # Keep track of the rewards collected per episode.
             rewards_per_episode.append(episode_reward)
-            num_pellets_remaining.append((NUM_PELLETS - len(env.pellets.pelletList)) / NUM_PELLETS)
-            num_wins.append(1 if env.win == True else 0)
+            episodes_lengths.append(episode_length)
 
             # Save model when new best reward is obtained.
             if is_training:
                 if episode_reward > best_reward:
-                    log_message = f"{datetime.now().strftime(DATE_FORMAT)}: New best reward {episode_reward:0.1f} ({(episode_reward-best_reward)/best_reward*100:+.1f}%) at episode {episode}, saving model..."
+                    log_message = f"{datetime.now().strftime(DATE_FORMAT)}: New best reward {episode_reward:0.1f} ({(episode_reward-best_reward)/best_reward*100:+.1f}%) at episode {episode} ... with episode length: {episode_length}, saving model..."
                     print(log_message)
                     with open(self.LOG_FILE, 'a') as file:
                         file.write(log_message + '\n')
@@ -192,11 +215,10 @@ class Agent():
                     torch.save(policy_dqn.state_dict(), self.MODEL_FILE)
                     best_reward = episode_reward
 
-
                 # Update graph every x seconds
                 current_time = datetime.now()
                 if current_time - last_graph_update_time > timedelta(seconds=10):
-                    self.save_graph(rewards_per_episode, epsilon_history ,num_pellets_remaining , num_wins)
+                    self.save_graph(rewards_per_episode , episodes_lengths)
                     last_graph_update_time = current_time
 
                 # If enough experience has been collected
@@ -212,44 +234,29 @@ class Agent():
                     if step_count > self.network_sync_rate:
                         target_dqn.load_state_dict(policy_dqn.state_dict())
                         step_count=0
-            env.update(agent_direction = STOP , render=render)  ## make another update after fininshing the episode to restart
 
-    def save_graph(self, rewards_per_episode, epsilon_history , num_pellets_remaining , num_wins):
+
+    def save_graph(self, rewards_per_episode, episodes_lengths):
         # Save plots
         fig = plt.figure(1)
 
         # Plot average rewards (Y-axis) vs episodes (X-axis)
         mean_rewards = np.zeros(len(rewards_per_episode))
         for x in range(len(mean_rewards)):
-            mean_rewards[x] = np.mean(rewards_per_episode[max(0, x-99):(x+1)])
-        plt.subplot(221) 
-        plt.xlabel('Time Steps')
+            mean_rewards[x] = np.mean(rewards_per_episode[max(0, x-30):(x+1)])
+        plt.subplot(121) 
+        plt.xlabel('Episodes')
         plt.ylabel('Mean Rewards')
         plt.plot(mean_rewards)
 
         # Plot average num_pellets_remaining (Y-axis) vs episodes (X-axis)
-        mean_pellets_remaining = np.zeros(len(num_pellets_remaining))
-        for x in range(len(mean_pellets_remaining)):
-            mean_pellets_remaining[x] = np.mean(num_pellets_remaining[max(0, x-99):(x+1)])
-        plt.subplot(222) 
-        plt.xlabel('Time Steps')
-        plt.ylabel('AVG remaining pellets')
-        plt.plot(mean_pellets_remaining)
-
-        # Plot average num of wins (Y-axis) vs episodes (X-axis)
-        mean_episode_wins = np.zeros(len(num_wins))
-        for x in range(len(mean_episode_wins)):
-            mean_episode_wins[x] = sum(num_wins[max(0, x-99):(x+1)]) / ((x+1) - max(0, x-99))
-        plt.subplot(223) 
-        plt.xlabel('Time Steps')
-        plt.ylabel('Mean num of wins')
-        plt.plot(mean_episode_wins)
-
-        # Plot epsilon decay (Y-axis) vs episodes (X-axis)
-        plt.subplot(224) # plot on a 1 row x 2 col grid, at cell 2
-        plt.xlabel('Time Steps')
-        plt.ylabel('Epsilon Decay')
-        plt.plot(epsilon_history)
+        mean_episodes_lengths = np.zeros(len(episodes_lengths))
+        for x in range(len(mean_episodes_lengths)):
+            mean_episodes_lengths[x] = np.mean(episodes_lengths[max(0, x-30):(x+1)])
+        plt.subplot(122) 
+        plt.xlabel('Episodes')
+        plt.ylabel('AVG episodes length')
+        plt.plot(mean_episodes_lengths)
 
         plt.subplots_adjust(wspace=1.0, hspace=1.0)
 
@@ -316,7 +323,7 @@ if __name__ == '__main__':
 
     #dql = Agent(hyperparameter_set=args.hyperparameters)
     dql = Agent("pacman")
-    dql.run(is_training=True, render=True)
+    dql.run(is_training=False, render=True)
     # if args.train:
     #     dql.run(is_training=True)
     # else:
