@@ -37,7 +37,7 @@ device = 'cuda'
 class Agent():
 
     def __init__(self, hyperparameter_set):
-        with open('hyperparameters_more_exp.yml', 'r') as file:
+        with open('hyperparameters_more_expl.yml', 'r') as file:
             all_hyperparameter_sets = yaml.safe_load(file)
             hyperparameters = all_hyperparameter_sets[hyperparameter_set]
             # print(hyperparameters)
