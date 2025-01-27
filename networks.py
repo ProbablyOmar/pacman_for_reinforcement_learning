@@ -116,13 +116,13 @@ class ActorNetwork(nn.Module):
             actions: tensor representing the probabilities of actions
         """
          # Debugging: Print the shape of the state
-        print(f"State shape before flattening: {state.shape}")
+        # print(f"State shape before flattening: {state.shape}")
 
         # Reshape state to match input size for the fully connected layer
         state = state.view(state.size(0), -1)  # Flatten the state to (batch_size, 868)
 
         # Debugging: Print the shape after flattening
-        print(f"State shape after flattening: {state.shape}")
+        # print(f"State shape after flattening: {state.shape}")
         x = self.relu(self.fc1(state))
         x = self.relu(self.fc2(x))
         actions = F.softmax(self.fc3(x), dim=-1) 
@@ -130,9 +130,9 @@ class ActorNetwork(nn.Module):
     
     
     def save_checkpoint(self):
-        print(f"Saving checkpoint to {self.chkpt_file}...")
+        # print(f"Saving checkpoint to {self.chkpt_file}...")
         T.save(self.state_dict(), self.chkpt_file)
 
     def load_checkpoint(self):
-        print(f"Loading checkpoint from {self.chkpt_file}...")
+        # print(f"Loading checkpoint from {self.chkpt_file}...")
         self.load_state_dict(T.load(self.chkpt_file))

@@ -34,7 +34,7 @@ if "pacman-v0" not in gym.envs.registry:
 class PacmanEnv(ParallelEnv):
     metadata = {"render_modes": ["human"], "render_fps": 60}
 
-    def __init__(self, render_mode=None, mode = SCARY_2_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3 , maze_mode = MAZE1 , pac_pos_mode = NORMAL_PAC_POS):
+    def __init__(self, render_mode=None, mode = SCARY_1_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3 , maze_mode = MAZE1 , pac_pos_mode = NORMAL_PAC_POS):
         self.game = GameController(rlTraining=True, mode = mode , move_mode = move_mode , clock_tick = clock_tick , pacman_lives = pacman_lives , maze_mode=maze_mode , pac_pos_mode = pac_pos_mode)
         self.game_score = 0
         self.useless_steps = 0
@@ -63,10 +63,8 @@ class PacmanEnv(ParallelEnv):
         return spaces.Discrete(5)
 
     def _getobs(self):
-        #there is a problem in pacman observation returning none
-        # print("Pacman observation:", self.game.observation)
-        print("Pacman observation:" , self.game.maze_map)  
-        print("Pacman position:", self.game.pacman.position)  
+        # print("Pacman observation:" , self.game.maze_map)  
+        # print("Pacman position:", self.game.pacman.position)  
         # self._maze_map = self.game.observation
         self._maze_map = self.game.maze_map
         self._maze_map = np.expand_dims(self._maze_map, axis=0)
@@ -78,14 +76,13 @@ class PacmanEnv(ParallelEnv):
             "pacman": self._maze_map,              
             "ghost": self._maze_map
             }
-        
-        print("Observations:", observations)
+    
         return observations
 
 
     def reset(self, seed=None, options=None):
         self.agents = copy.copy(self.possible_agents)
-        print("Possible Agents",self.possible_agents)
+        # print("Possible Agents",self.possible_agents)
         self.game.restartGame()
 
         observation = self._getobs()
@@ -99,7 +96,7 @@ class PacmanEnv(ParallelEnv):
         # pacman_action = agents_directions["pacman"]
         # ghost_action = agents_directions["ghosts"]
         
-        print("agents_directions:", agents_directions)
+        # print("agents_directions:", agents_directions)
         # print("agents_directions: pacman",agents_directions["pacman"].shape)
         agents_directions["pacman"] = agents_directions["pacman"].squeeze(0).argmax(dim=-1).item()
         pacman_action = None 
@@ -112,9 +109,10 @@ class PacmanEnv(ParallelEnv):
                 pacman_action = UP
             elif agents_directions["pacman"] == 3:  # Left
                 pacman_action = LEFT
-            else:
-                print("No Pacman actions provided , got" , agents_directions["pacman"])
+            # else:
+            #     print("Pacman actions provided" , agents_directions["pacman"])
             
+        
             # print("Observation space for pacman:", env.observation_space("pacman"))
             # print("Action space for pacman:", env.action_space("pacman"))
             # print("Observation space for ghosts:", env.observation_space("ghosts"))
@@ -131,9 +129,9 @@ class PacmanEnv(ParallelEnv):
                     ghost_action = UP
                 elif agents_directions["ghosts"][0] == 3:  # Left
                     ghost_action = LEFT
-            else:
-                # Handle the case where "ghosts" is not in agents_directions
-                print("No ghost actions provided.")
+            # else:
+            #     # Handle the case where "ghosts" is not in agents_directions
+            #     print("ghost actions recieved.", agents_directions["ghost"])
  
                 
             agents_directions = {
@@ -182,11 +180,11 @@ class PacmanEnv(ParallelEnv):
                 np.copyto(self._last_obs, observations["pacman"])
                 self.game_score += step_reward["pacman"]
                 
-            print("****************************")
-            print("Observations:", observations)
-            print("Rewards:", reward)
-            print("Terminated:", terminated)
-            print("Truncated:", truncated)
+            # print("****************************")
+            # print("Observations:", observations)
+            # print("Rewards:", reward)
+            # print("Terminated:", terminated)
+            # print("Truncated:", truncated)
 
             return observations, step_reward, terminated, truncated, info 
 
@@ -251,9 +249,9 @@ if __name__ == "__main__":
     n_actions = 5
     # Debugging output
 
-    print("Possible agents:", possible_agents)
-    print("Actor dimensions:", actor_dims)
-    print("Critic dimensions:", critic_dims)
+    # print("Possible agents:", possible_agents)
+    # print("Actor dimensions:", actor_dims)
+    # print("Critic dimensions:", critic_dims)
     
     
 
@@ -277,8 +275,7 @@ if __name__ == "__main__":
             device='cuda',
             )
 
-        
-        
+            
         memory = MultiAgentReplayBuffer(
                 max_size=100000, 
                 critic_dims=critic_dims,  
@@ -292,7 +289,7 @@ if __name__ == "__main__":
 
 
         total_episodes = 5000
-        MAX_STEPS = 10000
+        MAX_STEPS = 100
         n_agents = len(possible_agents) 
         PRINT_INTERVAL = 100
         total_steps = 0
@@ -319,7 +316,7 @@ if __name__ == "__main__":
                 actions = {}
                 for agent in env.possible_agents:
                     raw_obs = [obs[agent] for agent in env.possible_agents]  # Collect all agent observations
-                    print("Raw observations:", raw_obs)
+                    # print("Raw observations:", raw_obs)
                     actions = maddpg_agents.choose_action(raw_obs)
                     obs_, rewards, terminated, truncated, info = env.step(actions)
                 
@@ -335,6 +332,9 @@ if __name__ == "__main__":
                 ###store in replay buffer
                 memory.store_transition(obs, state, actions, rewards, obs_, state_, done)  
                 
+                # Update agent after each step
+                maddpg_agents.learn(memory)
+                
                 if total_steps % 100 == 0 and not evaluate:
                     maddpg_agents.learn(memory)
                 
@@ -342,20 +342,24 @@ if __name__ == "__main__":
                 
                 # Extract values from the rewards dictionary and sum them
                 score += sum(rewards.values())
+                print(score)
 
                 total_steps += 1
                 episode_step += 1
                 
             score_history.append(score)
             avg_score = np.mean(score_history[-100:])
+            # Print episode summary
+            print(f"Episode {episode + 1}/{total_episodes}:")
             
+                
             if not evaluate:
                 if avg_score > best_score:
                     maddpg_agents.save_checkpoint()  # Save the model if it performs better than before
                     best_score = avg_score
                     
+                    
             if episode % PRINT_INTERVAL == 0 and episode > 0:
                 print('episode', episode, 'average score {:.1f}'.format(avg_score))
-                
                 
         env.close()
