@@ -21,46 +21,46 @@ class CriticNetwork(nn.Module):
     """
     def __init__(self, beta, input_dims, n_agents, n_actions, name, chkpt_dir="tmp/maddpg"):
         super(CriticNetwork, self).__init__()
-        
-        input_dims = (GAME_ROWS, GAME_COLS)
-        self.height, self.width = input_dims
-        
+
+        input_dims = 31*28
         self.n_agents = n_agents
         self.n_actions = n_actions
-        ###our network layers
-        #####################
-        self.fc1 = nn.Linear(self.height * self.width + n_agents * n_actions, 256)  
+        
+        self.fc1 = nn.Linear(870, 256)
         self.fc2 = nn.Linear(256, 128)
         self.fc3 = nn.Linear(128, 1)
         self.relu = nn.ReLU()
-        
+
         self.optimizer = optim.Adam(self.parameters(), lr=beta)
-        
+
+        # Device setup
         self.device = T.device('cuda' if T.cuda.is_available() else 'cpu')
         self.to(self.device)
-        
-        
+
+        # Save/load path
         self.chkpt_dir = chkpt_dir
         self.chkpt_file = os.path.join(self.chkpt_dir, f"{name}_critic.pth")
-        
 
     def forward(self, states, actions):
-        """
-        Forward propagation through the network.
+        # Debugging: Print the shapes before concatenation
+        print(f"State shape: {states.shape}")
+        print(f"Action shape: {actions.shape}")
 
-        Parameters:
-            state: input state tensor
-            actions: input actions tensor
+        # Concatenate states and actions
+        x = T.cat([states, actions], dim=1)
 
-        Returns:
-            Q-value: scalar value representing the Q-value for the given state-action pair
-        """
-        state = state.view(state.size(0), -1)  # Flatten the state input
-        x = T.cat([state, actions], dim=1)  # Concatenate state and actions
+        # Debugging: Print the shape after concatenation
+        print(f"Concatenated shape: {x.shape}")
+
+        # Pass through the network layers
+
         x = self.relu(self.fc1(x))
+        print(f"Shape before fc1: {x.shape}")
         x = self.relu(self.fc2(x))
-        q = self.fc3(x)
-        return q
+        q_value = self.fc3(x)
+
+        return q_value
+
     
 
     def save_checkpoint(self):
@@ -86,13 +86,12 @@ class ActorNetwork(nn.Module):
     def __init__(self, alpha, input_dims, n_actions, name, chkpt_dir="tmp/maddpg", device='cuda'):
         super(ActorNetwork, self).__init__()
         
-        input_dims = (GAME_ROWS, GAME_COLS)
-        self.height, self.width = input_dims
+        input_dims = 32*28
         
         self.device = T.device(device if T.cuda.is_available() else 'cpu')
         self.to(self.device)
         
-        self.fc1 = nn.Linear(self.height * self.width, 256)  
+        self.fc1 = nn.Linear(868, 256)  
         self.fc2 = nn.Linear(256, 128)
         self.fc3 = nn.Linear(128, n_actions)
         self.relu = nn.ReLU()
@@ -116,7 +115,14 @@ class ActorNetwork(nn.Module):
         Returns:
             actions: tensor representing the probabilities of actions
         """
-        state = state.view(state.size(0), -1)  # Flatten the state input
+         # Debugging: Print the shape of the state
+        print(f"State shape before flattening: {state.shape}")
+
+        # Reshape state to match input size for the fully connected layer
+        state = state.view(state.size(0), -1)  # Flatten the state to (batch_size, 868)
+
+        # Debugging: Print the shape after flattening
+        print(f"State shape after flattening: {state.shape}")
         x = self.relu(self.fc1(state))
         x = self.relu(self.fc2(x))
         actions = F.softmax(self.fc3(x), dim=-1) 
@@ -130,4 +136,3 @@ class ActorNetwork(nn.Module):
     def load_checkpoint(self):
         print(f"Loading checkpoint from {self.chkpt_file}...")
         self.load_state_dict(T.load(self.chkpt_file))
-

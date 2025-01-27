@@ -18,11 +18,12 @@ class Agent:
         
         
         
-        self.actor = ActorNetwork(alpha, actor_dims, n_actions, name=self.agent_name+'_actor')
-        self.critic = CriticNetwork(beta, critic_dims, n_agents, n_actions, name=self.agent_name+'_critic')
-        self.target_actor = ActorNetwork(alpha, actor_dims, n_actions, name=self.agent_name+'_target_actor')
-        self.target_critic = CriticNetwork(beta, critic_dims, n_agents, n_actions, name=self.agent_name+'_target_critic', chkpt_dir=chkpt_dir)
-        
+        self.actor = ActorNetwork(alpha, actor_dims, n_actions, name=self.agent_name+'_actor').to(device)
+        self.critic = CriticNetwork(beta, critic_dims, n_agents, n_actions, name=self.agent_name+'_critic').to(device)
+        self.target_actor = ActorNetwork(alpha, actor_dims, n_actions, name=self.agent_name+'_target_actor').to(device)
+        self.target_critic = CriticNetwork(beta, critic_dims, n_agents, n_actions, name=self.agent_name+'_target_critic', chkpt_dir=chkpt_dir).to(device)
+
+                
         self.update_network_paramters(tau=1)
 
         
@@ -57,14 +58,7 @@ class Agent:
         
         self.target_critic.load_state_dict(critic_state_dict)
         
-    ######    
-    # def choose_action(self, observation):
-    #     state = T.tensor([observation], dtype=T.float).to(self.actor.device)
-    #     actions = self.actor.forward(state)
-    #     noise = T.rand(self.n_actions).to(self.actor.device)
-    #     action = actions + noise
 
-    #     return action.detach().cpu().numpy()[0]
     def choose_action(self, observations, noise_scale=0.1):
         """
         Choose an action based on the current policy and add exploration noise.
@@ -82,8 +76,9 @@ class Agent:
 
         # Clip the action to be within valid bounds (assuming [-1, 1])
         action = T.clamp(action, -1, 1)
-
-        return action.detach().cpu().numpy()[0]
+        device = 'cuda'
+        actions = action.to(self.actor.device)
+        return actions
 
 
         
@@ -109,9 +104,9 @@ class MADDPG:
         self.n_actions = n_actions
         
         
-        for agent in self.possible_agents:  # Iterate over agent names
-            agent_id = self.possible_agents.index(agent)  # Find the index of the agent
-            self.agents.append(Agent(actor_dims[agent], critic_dims, n_actions, agent_id, alpha=alpha, beta=beta, chkpt_dir=chkpt_dir))   
+        for agent_id, agent in enumerate(self.possible_agents):  # Use enumerate to get the integer index
+            self.agents.append(Agent(actor_dims[agent_id], critic_dims, n_actions, agent_id, alpha=alpha, beta=beta, chkpt_dir=chkpt_dir))
+          
             
     def save_checkpoint(self):
         for agent in self.agents:
@@ -131,32 +126,35 @@ class MADDPG:
     
     def choose_action(self, raw_obs, noise_scale=0.1):
         """
-        Choose actions for all possible agents based on their respective observations.
-        
+        Choose actions for all agents based on their respective observations and add exploration noise.
+
         Parameters:
-        - raw_obs (dict): A dictionary containing observations for all possible agents
-                        with keys corresponding to agent names (e.g., 'pacman', 'ghost').
+        - raw_obs (2D array): A 2D array where each row corresponds to the observation of an agent.
         - noise_scale (float): The scale of the noise to be added for exploration.
 
         Returns:
-        - actions (dict): A dictionary containing actions for all agents.
+        - actions (dict): A dictionary containing actions for all agents, where keys are agent names.
         """
         actions = {}
-        
-        for agent in zip(self.possible_agents, self.agents):
-            if agent in raw_obs:
-                observation = raw_obs[agent]
-                # state = T.tensor([observation], dtype=T.float).to(agent.actor.device)
-                state = T.tensor([observation.x, observation.y], dtype=T.float)
-                print(state)
-                action = agent.actor.forward(state)
-                noise = T.normal(mean=0, std=noise_scale, size=action.shape).to(agent.actor.device)
-                action = action + noise
-                action = T.clamp(action, -1, 1)  # Clip action to valid bounds
-                actions[agent] = action.detach().cpu().numpy()[0]
-        
+
+        # Ensure raw_obs is a 2D array with enough rows for all agents
+        if len(raw_obs) != len(self.agents):  # len(raw_obs) gives the number of rows (agents)
+            raise IndexError(f"Expected {len(self.agents)} observations, but raw_obs has {len(raw_obs)} rows.")
+
+        # Loop over the agents and choose actions based on their observations
+        for idx, agent in enumerate(self.agents):
+            # Get the observation for the agent (raw_obs[idx] gives the observation for the agent)
+            observation = raw_obs[idx]  # This is a 1D array representing the observation of the agent
+
+            # Choose action for the agent
+            action = agent.choose_action(observation, noise_scale)
+            agent_name = self.possible_agents[idx]  # Get the agent's name (e.g., 'pacman', 'ghost')
+            actions[agent_name] = action.to(agent.actor.device)
+
         return actions
 
+
+            
         
 
     def learn(self, memory):
@@ -172,6 +170,7 @@ class MADDPG:
         rewards = T.tensor(rewards).to(device)
         states_ = T.tensor(states_, dtype=T.float).to(device)
         dones = T.tensor(dones).to(device)
+
         
         all_agents_new_actions = []
         all_agents_new_mu_actions = []

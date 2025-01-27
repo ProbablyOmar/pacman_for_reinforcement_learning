@@ -212,7 +212,12 @@ class GameController(object):
         #########################
         ## get the directions of the agents
         pacman_direction = agents_directions["pacman"]
-        ghosts_directions = agents_directions["ghosts"]
+        if 'ghosts' in agents_directions:
+            ghosts_directions = agents_directions['ghosts']
+        else:
+            # Handle the case where 'ghosts' is not in the dictionary
+            ghosts_directions = []
+            print("Warning: 'ghosts' key not found in agents_directions.")
 
         self.episode_steps += 1
         # print(agent_direction)
@@ -445,7 +450,7 @@ class GameController(object):
                 self.ghosts.startFreight()
 
         if self.pellets.isEmpty():
-            #self.updateScore(self.finish_level_reward)
+            self.updateScore(self.finish_level_reward) ###
             self.win = True
             self.flashBG = False
             self.hideEntities()
@@ -507,10 +512,10 @@ class GameController(object):
 
 
 if __name__ == "__main__":
-    game = GameController(rlTraining=True , mode = NORMAL_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
+    game = GameController(rlTraining=True , mode = SCARY_1_MODE , move_mode = DISCRETE_STEPS_MODE , clock_tick= 10 , pacman_lives=1 , maze_mode=MAZE1 , pac_pos_mode=NORMAL_PAC_POS)
     done = False
-    agent_direction=LEFT
-    agents_directions = {"pacman" : LEFT , "ghosts" : [LEFT , None , None , None]}
+    agent_direction= None
+    agents_directions = {"pacman" : None , "ghosts" : [ None , None , None , None]}
     while not done:
         
         game.update(render=True , agents_directions = agents_directions)
