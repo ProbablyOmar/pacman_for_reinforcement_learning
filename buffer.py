@@ -39,6 +39,7 @@ class MultiAgentReplayBuffer:
         :param state_: Centralized next joint state for the critic.
         :param done: List of terminal flags for each agent (one flag per agent).
         """
+        print("Storing transition...")
         for agent, agent_done in zip(raw_obs.keys(), done):  # Iterate through agents and their corresponding done flags
             self.actor_memory[agent]["state"].append(raw_obs[agent])  # Storing the observations
             self.actor_memory[agent]["action"].append(action[agent])  # Storing the actions
@@ -59,6 +60,8 @@ class MultiAgentReplayBuffer:
         # If memory exceeds max size, remove the oldest transition
         if self.mem_cntr > self.mem_size:
             self.remove_oldest_transition()
+            
+        print(f"Memory size: {len(self.critic_memory['state'])}")
 
 
     def remove_oldest_transition(self):

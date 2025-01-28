@@ -96,7 +96,7 @@ class Agent:
         
         
 class MADDPG:
-    def __init__(self, actor_dims, critic_dims, n_agents, n_actions, possible_agents, env, alpha=0.01, beta=0.01, gamma=0.99, tau=0.01, tensorboard_log=None, chkpt_dir="tmp/maddpg/", device='cuda'):
+    def __init__(self, actor_dims, critic_dims, n_agents, n_actions, possible_agents, env, alpha=0.01, beta=0.01, gamma=0.99, tau=0.01, chkpt_dir="tmp/maddpg/", device='cuda'):
         self.agents = []
         self.env = env
         self.possible_agents = possible_agents
@@ -161,8 +161,37 @@ class MADDPG:
         if not memory.ready():
             return
         
+        # Fetch data from replay buffer
+        batch, actor_batch = memory.sample_buffer()
+
+
+        # Extract critic data
+        states = T.tensor(batch["state"], dtype=T.float).to(self.agents[0].actor.device)
+        actions = batch["action"]
+        # rewards = T.tensor(batch["reward"], dtype=T.float).to(self.agents[0].actor.device)
+        # Assuming `batch["reward"]` is a dictionary with rewards for each agent.
+        # Convert the rewards for each agent into a list or array
+        # Debugging: print the structure of the batch to see if 'reward' is correct
+        print("Batch structure before learning:")
+        print(batch)  # Inspect the entire batch structure
+        print("Reward field in batch:", batch.get("reward"))  # Print out rewards field specifically
         
-        actor_states, states , actions , rewards , actor_new_states , states_ , dones = memory.sample_buffer()
+        # Debugging: Ensure rewards are a dictionary with the correct agent names
+        for agent in self.possible_agents:
+            print(f"Reward for {agent}: {batch['reward'].get(agent, 'No reward for this agent')}")
+            
+        rewards = T.tensor([batch["reward"][agent] for agent in self.possible_agents], dtype=T.float).to(self.agents[0].actor.device)
+        
+        states_ = T.tensor(batch["next_state"], dtype=T.float).to(self.agents[0].actor.device)
+        dones = T.tensor(batch["done"], dtype=T.float).to(self.agents[0].actor.device)
+
+        
+        
+        # Extract actor data
+        actor_states = {agent: T.tensor(actor_batch[agent]["state"], dtype=T.float).to(self.agents[0].actor.device) for agent in actor_batch}
+        actor_new_states = {agent: T.tensor(actor_batch[agent]["next_state"], dtype=T.float).to(self.agents[0].actor.device) for agent in actor_batch}
+        
+        
         device = self.agents[0].actor.device
         
         states = T.tensor(states, dtype=T.float).to(device)
@@ -170,6 +199,7 @@ class MADDPG:
         rewards = T.tensor(rewards).to(device)
         states_ = T.tensor(states_, dtype=T.float).to(device)
         dones = T.tensor(dones).to(device)
+        
 
         
         all_agents_new_actions = []
@@ -197,13 +227,22 @@ class MADDPG:
         for i, agent in enumerate(self.agents):
             
         
-            critic_value_ = agent.target_critic.forward(states_, new_actions).flatten()
+            critic_value_ = agent.target_critic.forward(T.cat([states_, new_actions], dim=-1)).flatten()
+            critic_value = agent.critic.forward(T.cat([states, old_actions], dim=-1)).flatten()
+
             critic_value_[dones[:,0]] = 0.0
-            critic_value = agent.critic.forward(states, old_actions).flatten()
+            
+            print(f"critic_value_: {critic_value_}")
+            print(f"critic_value: {critic_value}")
+
             
             
             target = rewards[:, i] + agent.gamma*critic_value_
             critic_loss = F.mse_loss(target, critic_value)
+            
+            print(f"target: {target}")
+            print(f"Critic loss: {critic_loss.item()}")
+
             agent.critic.optimizer.zero_grad()
             critic_loss.backward(retain_graph=True)
             agent.critic.optimizer.step()
@@ -213,7 +252,8 @@ class MADDPG:
             agent.actor.optimizer.zero_grad()
             actor_loss.backward(retain_graph=True)
             agent.actor.optimizer.step()
-            
+            print(f"Actor loss: {actor_loss.item()}")
+
             agent.update_network_paramters()
             
 

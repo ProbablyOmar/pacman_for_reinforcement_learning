@@ -3,7 +3,6 @@ from pygame.locals import *
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from gymnasium.utils.env_checker import check_env
-import numpy as np
 from gymnasium import spaces
 from pettingzoo import ParallelEnv
 from run import GameController
@@ -21,6 +20,7 @@ from torch.optim import Adam
 from multi_ddpg import MADDPG
 from buffer import MultiAgentReplayBuffer
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 
@@ -34,7 +34,7 @@ if "pacman-v0" not in gym.envs.registry:
 class PacmanEnv(ParallelEnv):
     metadata = {"render_modes": ["human"], "render_fps": 60}
 
-    def __init__(self, render_mode=None, mode = SCARY_1_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3 , maze_mode = MAZE1 , pac_pos_mode = NORMAL_PAC_POS):
+    def __init__(self, render_mode=None, mode = SCARY_1_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3 , maze_mode = MAZE1 , pac_pos_mode = RANDOM_PAC_POS):
         self.game = GameController(rlTraining=True, mode = mode , move_mode = move_mode , clock_tick = clock_tick , pacman_lives = pacman_lives , maze_mode=maze_mode , pac_pos_mode = pac_pos_mode)
         self.game_score = 0
         self.useless_steps = 0
@@ -161,8 +161,16 @@ class PacmanEnv(ParallelEnv):
             for ghost_position in ghost_positions:
                 distance = math.hypot(pacman_position.x - ghost_position.x, pacman_position.y - ghost_position.y)
                 if distance == 0:
-                    distance = 1e-6 #avoid div by 0
-                    ghost_reward += (1 / distance) * 50  # Simple reward based on distance from Pacman
+                    distance = 1e-6  # Avoid division by 0
+
+                # Positive reward for being closer to Pacman
+                ghost_reward += (1 / distance) * 20  
+
+                if distance < 1:
+                    ghost_reward += 15  # Reward for catching Pacman
+                    
+            # Print the rewards for both agents
+            # print(f"Pacman Reward: {pacman_reward}, Ghost Reward: {ghost_reward}")
 
             # Update terminated and truncated flags
             terminated = {a: self.game.done for a in self.agents}
@@ -210,156 +218,163 @@ def obs_list_to_state_vector(obs_list):
 
 
 
+# Ensure plot directory exists
+plot_dir = "./training_plots"
+os.makedirs(plot_dir, exist_ok=True)
+
+# Initialize environment and other components
 if __name__ == "__main__":
-    
+    env_not_render = PacmanEnv(render_mode=None, mode=SCARY_1_MODE, move_mode=DISCRETE_STEPS_MODE, clock_tick=0, pacman_lives=3, maze_mode=MAZE1, pac_pos_mode=RANDOM_PAC_POS)
+    env_render = PacmanEnv(render_mode="human", mode=SCARY_1_MODE, move_mode=DISCRETE_STEPS_MODE, clock_tick=10, pacman_lives=3, maze_mode=MAZE1, pac_pos_mode=RANDOM_PAC_POS)
 
-    env_not_render = PacmanEnv(render_mode=None,  mode = SCARY_1_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 0 , pacman_lives = 3 , maze_mode = MAZE1 ,  pac_pos_mode = NORMAL_PAC_POS )
-    env_render = PacmanEnv(render_mode="human" ,  mode = SCARY_1_MODE , move_mode = DISCRETE_STEPS_MODE, clock_tick = 10 , pacman_lives = 3 , maze_mode = MAZE1 ,  pac_pos_mode = NORMAL_PAC_POS )
-
-
-    model_path = "./models/maddpg"
-    log_path = "./logs/maddpg"
+    # model_path = "./models/maddpg"
     chkpt_dir = "./tmp/maddpg/"
-
-    os.makedirs(model_path, exist_ok=True)
-    os.makedirs(log_path, exist_ok=True)
+    
+    # os.makedirs(model_path, exist_ok=True)
     os.makedirs(chkpt_dir, exist_ok=True)
 
-    
-    # env = env_not_render
     env = env_render
-    #n_agents = 2
     possible_agents = env.possible_agents 
-    
     
     actor_dims = []
     for agent in env.possible_agents:
         if agent == "pacman":
-            actor_dims.append(np.prod(env.observation_space(agent).shape))  # Flattening the observation space
+            actor_dims.append(np.prod(env.observation_space(agent).shape))
         elif agent == "ghost":
-            actor_dims.append(np.prod(env.observation_space(agent).shape))  # Flattening the observation space
+            actor_dims.append(np.prod(env.observation_space(agent).shape))
             
-    joint_state_dim = sum(actor_dims)  # Sum of state dimensions for all agents
-    joint_action_dim = sum([env.action_space(agent).n for agent in env.possible_agents])  
+    joint_state_dim = sum(actor_dims)
+    joint_action_dim = sum([env.action_space(agent).n for agent in env.possible_agents])
     
     critic_dims = [joint_state_dim, joint_action_dim]
     
-    
-    
     n_actions = 5
-    # Debugging output
 
-    # print("Possible agents:", possible_agents)
-    # print("Actor dimensions:", actor_dims)
-    # print("Critic dimensions:", critic_dims)
-    
-    
+    # Initialize MADDPG agents
+    maddpg_agents = MADDPG(
+        actor_dims,
+        critic_dims,
+        n_agents=len(env.possible_agents),
+        n_actions=n_actions, 
+        possible_agents=env.possible_agents,
+        env=env,
+        alpha=0.01,
+        beta=0.01,
+        gamma=0.99,
+        tau=0.01,
+        chkpt_dir=chkpt_dir,
+        device='cuda',
+    )
 
-    model_final_path = os.path.join(model_path, "MADDPG_model.pth")
-    if not os.path.exists(model_final_path):
+    memory = MultiAgentReplayBuffer(
+        max_size=1000000,
+        critic_dims=critic_dims,
+        actor_dims=actor_dims,
+        possible_agents=possible_agents,
+        n_agents=len(env.possible_agents),
+        n_actions=n_actions,
+        batch_size=1024,
+        env=env
+    )
+
+    num_episodes = 500000  #100000
+    MAX_STEPS = 10000
+    n_agents = len(possible_agents)
+    PRINT_INTERVAL = 5
+    total_steps = 0
+    best_score = -np.inf
+    score_history = []
+    
+    evaluate = False
+
+    is_training = True
+    evaluate = False
+    
+    episode_rewards = []
+    pacman_rewards = []
+    ghost_rewards = []
+
+    def plot_training():
+        plt.figure(figsize=(15, 5))
+
+        # Total Episode Reward
+        plt.subplot(1, 3, 1)
+        plt.plot(episode_rewards, label="Total Reward")
+        plt.xlabel("Episodes")
+        plt.ylabel("Reward")
+        plt.title("Total Episode Reward")
+        plt.legend()
+
+        # Agent-Specific Rewards (Pacman and Ghosts)
+        plt.subplot(1, 3, 2)
+        plt.plot(pacman_rewards, label="Pacman Reward", color="blue")
+        plt.plot(ghost_rewards, label="Ghosts Reward", color="orange")
+        plt.xlabel("Episodes")
+        plt.ylabel("Reward")
+        plt.title("Agent-Specific Rewards")
+        plt.legend()
+
+        # Save the plot
+        plot_filename = os.path.join(plot_dir, f"training_plot_episode_{episode}.png")
+        plt.savefig(plot_filename)
+        plt.close()
+
+    if is_training:
         print("Training new MADDPG model...")
-        
-        maddpg_agents = MADDPG(
-            actor_dims,  # Actor; Takes individual states
-            critic_dims,  # Critic; Takes joint states and joint actions 
-            n_agents=len(env.possible_agents),
-            n_actions=n_actions, 
-            possible_agents=env.possible_agents,
-            env=env,
-            alpha=0.01,
-            beta=0.01,
-            gamma=0.99,
-            tau=0.01,
-            chkpt_dir=chkpt_dir,
-            tensorboard_log=log_path,
-            device='cuda',
-            )
-
-            
-        memory = MultiAgentReplayBuffer(
-                max_size=100000, 
-                critic_dims=critic_dims,  
-                actor_dims=actor_dims,  
-                possible_agents=possible_agents,
-                n_agents=len(env.possible_agents), 
-                n_actions=n_actions, 
-                batch_size=1024,
-                env=env
-            )
-
-
-        total_episodes = 5000
-        MAX_STEPS = 100
-        n_agents = len(possible_agents) 
-        PRINT_INTERVAL = 100
-        total_steps = 0
-        best_score = -np.inf
-        score_history = []
-        evaluate = False
-        
-        
-        if evaluate:
-            maddpg_agents.load_checkpoint()
-            
-        
-        for episode in range(total_episodes):
-            obs, _ = env.reset()  
+        for episode in range(num_episodes):
+            obs, _ = env.reset()
             score = 0
             done = [False] * n_agents
             episode_step = 0
+            pacman_episode_reward = 0
+            ghost_episode_reward = 0
+            total_reward = 0
 
             while not any(done):
                 if evaluate:
                     env.render()
-                # Chooses actions for each agent based on their individual states
-                # ##### Actor
+                
                 actions = {}
                 for agent in env.possible_agents:
-                    raw_obs = [obs[agent] for agent in env.possible_agents]  # Collect all agent observations
-                    # print("Raw observations:", raw_obs)
+                    raw_obs = [obs[agent] for agent in env.possible_agents]
                     actions = maddpg_agents.choose_action(raw_obs)
                     obs_, rewards, terminated, truncated, info = env.step(actions)
-                
-                
 
-                # Prepare joint state and next joint state for the critic
                 state = obs_list_to_state_vector([obs[agent] for agent in env.possible_agents])
                 state_ = obs_list_to_state_vector([obs_[agent] for agent in env.possible_agents])
-                
+
                 if episode_step >= MAX_STEPS:
-                    done = [True]*n_agents
+                    done = [True] * n_agents
+
+                total_reward += sum(rewards.values())
+                pacman_episode_reward += rewards["pacman"]
+                ghost_episode_reward += rewards["ghost"]
+
+                memory.store_transition(obs, state, actions, rewards, obs_, state_, done)
                 
-                ###store in replay buffer
-                memory.store_transition(obs, state, actions, rewards, obs_, state_, done)  
-                
-                # Update agent after each step
-                maddpg_agents.learn(memory)
-                
-                if total_steps % 100 == 0 and not evaluate:
-                    maddpg_agents.learn(memory)
-                
+                if total_steps % 10 == 0 and is_training:
+                    maddpg_agents.learn(memory)   # Perform learning every 10 steps
+
                 obs = obs_
-                
-                # Extract values from the rewards dictionary and sum them
                 score += sum(rewards.values())
-                print(score)
+                episode_rewards.append(total_reward)
+                pacman_rewards.append(pacman_episode_reward)
+                ghost_rewards.append(ghost_episode_reward)
 
                 total_steps += 1
                 episode_step += 1
-                
+
             score_history.append(score)
             avg_score = np.mean(score_history[-100:])
-            # Print episode summary
-            print(f"Episode {episode + 1}/{total_episodes}:")
-            
-                
-            if not evaluate:
-                if avg_score > best_score:
-                    maddpg_agents.save_checkpoint()  # Save the model if it performs better than before
-                    best_score = avg_score
-                    
-                    
+            print(f"Episode {episode}, Score: {score}, Average Score: {avg_score:.2f}, Total Reward: {total_reward:.2f}")
+
+            # Save plot every PRINT_INTERVAL episodes
             if episode % PRINT_INTERVAL == 0 and episode > 0:
-                print('episode', episode, 'average score {:.1f}'.format(avg_score))
-                
-        env.close()
+                print(f"Episode {episode} - Plotting and saving rewards")
+                plot_training()  # Plot and save rewards
+
+            # Save model checkpoint 
+            maddpg_agents.save_checkpoint()
+
+        # Save the final model after all episodes are complete
+        print("Training Completed!")
