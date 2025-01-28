@@ -25,6 +25,9 @@ class Agent:
 
                 
         self.update_network_paramters(tau=1)
+        
+        self.actor_loss = 0
+        self.critic_loss = 0
 
         
     
@@ -224,37 +227,33 @@ class MADDPG:
         mu = T.cat([acts for acts in all_agents_new_mu_actions], dim=1)
         old_actions = T.cat([acts for acts in old_agents_actions], dim=1)
         
+        # Now, for each agent, compute the critic loss
         for i, agent in enumerate(self.agents):
-            
-        
             critic_value_ = agent.target_critic.forward(T.cat([states_, new_actions], dim=-1)).flatten()
             critic_value = agent.critic.forward(T.cat([states, old_actions], dim=-1)).flatten()
 
-            critic_value_[dones[:,0]] = 0.0
+            critic_value_[dones[:, 0]] = 0.0
             
-            print(f"critic_value_: {critic_value_}")
-            print(f"critic_value: {critic_value}")
-
-            
-            
-            target = rewards[:, i] + agent.gamma*critic_value_
+            target = rewards[:, i] + agent.gamma * critic_value_
             critic_loss = F.mse_loss(target, critic_value)
-            
-            print(f"target: {target}")
-            print(f"Critic loss: {critic_loss.item()}")
 
             agent.critic.optimizer.zero_grad()
             critic_loss.backward(retain_graph=True)
             agent.critic.optimizer.step()
-            
+
+            print(f"critic_value_: {critic_value_}")
+            print(f"critic_value: {critic_value}")
+            print(f"critic_loss: {critic_loss.item()}")
+
+            # Now calculate the actor loss
             actor_loss = agent.critic.forward(states, mu).flatten()
             actor_loss = -T.mean(actor_loss)
             agent.actor.optimizer.zero_grad()
             actor_loss.backward(retain_graph=True)
             agent.actor.optimizer.step()
+
+            # Store actor loss in the agent
+            agent.actor_loss = actor_loss.item()  # Store the actor loss for later use or tracking
             print(f"Actor loss: {actor_loss.item()}")
 
             agent.update_network_paramters()
-            
-
-    
