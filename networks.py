@@ -35,6 +35,12 @@ class CriticNetwork(nn.Module):
         q_value = self.fc3(x)  # Output Q-value
         
         return q_value
+    
+    def save_checkpoint(self):
+        T.save(self.state_dict(), self.chkpt_file)
+
+    def load_checkpoint(self):
+        self.load_state_dict(T.load(self.chkpt_file))
 
 
 class ActorNetwork(nn.Module):
@@ -59,3 +65,9 @@ class ActorNetwork(nn.Module):
         x = F.relu(self.fc2(x)) 
         actions = F.softmax(self.fc3(x), dim=-1)  
         return actions
+    
+    def save_checkpoint(self):
+        T.save(self.state_dict(), self.chkpt_file)
+
+    def load_checkpoint(self):
+        self.load_state_dict(T.load(self.chkpt_file))

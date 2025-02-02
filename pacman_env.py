@@ -49,7 +49,7 @@ class PacmanEnv(ParallelEnv):
 
     @functools.lru_cache(maxsize=None)
     def observation_space(self, agent):
-        if agent == "pacman" or "ghost":
+        if agent in ["pacman", "ghost"]:
             return spaces.Box(
                 low=0, high=13, shape=(1, GAME_ROWS, GAME_COLS), dtype=np.int_
             )
@@ -136,7 +136,7 @@ class PacmanEnv(ParallelEnv):
                 
             agents_directions = {
                     "pacman": pacman_action,  
-                    "ghosts": [ghost_action , None , None , None] 
+                    "ghosts": [ghost_action, None , None , None ]
                 }
                 
             # Execute the game update
@@ -160,11 +160,11 @@ class PacmanEnv(ParallelEnv):
             ghost_reward = 0
             for ghost_position in ghost_positions:
                 distance = math.hypot(pacman_position.x - ghost_position.x, pacman_position.y - ghost_position.y)
-                if distance == 0:
-                    distance = 1e-6  # Avoid division by 0
+                # if distance == 0:
+                #     distance = 1e-6  # Avoid division by 0
 
-                # Positive reward for being closer to Pacman
-                ghost_reward += (1 / distance) * 20  
+                # # Positive reward for being closer to Pacman
+                # ghost_reward += (1 / distance)* 20  
 
                 if distance < 1:
                     ghost_reward += 15  # Reward for catching Pacman
@@ -179,10 +179,10 @@ class PacmanEnv(ParallelEnv):
             # Return observations and rewards
             observations = self._getobs()
             reward = {"pacman": pacman_reward, "ghost": ghost_reward}
+            # print(reward)
             info = {a: {} for a in self.agents}
             
-            if reward != TIME_PENALITY:
-                step_reward = reward
+            step_reward = reward if reward != 0 else TIME_PENALITY
 
             if not np.array_equal(observations["pacman"], self._last_obs):
                 np.copyto(self._last_obs, observations["pacman"])
@@ -207,6 +207,7 @@ class PacmanEnv(ParallelEnv):
 
 #################################################################
 #train maddpg 
+
 
 def obs_list_to_state_vector(obs_list):
     state = np.array([])
@@ -259,10 +260,10 @@ if __name__ == "__main__":
         n_actions=n_actions, 
         possible_agents=env.possible_agents,
         env=env,
-        alpha=0.01,
+        alpha=0.001,
         beta=0.01,
         gamma=0.99,
-        tau=0.01,
+        tau=0.001,
         chkpt_dir=chkpt_dir,
         device='cuda',
     )
@@ -274,14 +275,14 @@ if __name__ == "__main__":
         possible_agents=possible_agents,
         n_agents=len(env.possible_agents),
         n_actions=n_actions,
-        batch_size=1024,
+        batch_size=500,
         env=env
     )
 
-    num_episodes = 500000  #100000
-    MAX_STEPS = 10000
+    num_episodes = 50000
+    MAX_STEPS = 1000
     n_agents = len(possible_agents)
-    PRINT_INTERVAL =  50
+    PRINT_INTERVAL =  5
     total_steps = 0
     best_score = -np.inf 
     score_history = []
@@ -366,11 +367,13 @@ if __name__ == "__main__":
                 pacman_episode_reward = 0
                 ghost_episode_reward = 0
                 total_reward = 0
-
+                episode_length = 0 
+                
+                
                 while not any(done):
                     if evaluate:
                         env.render()
-                    
+
                     actions = {}
                     for agent in env.possible_agents:
                         raw_obs = [obs[agent] for agent in env.possible_agents]
@@ -388,25 +391,30 @@ if __name__ == "__main__":
                     ghost_episode_reward += rewards["ghost"]
 
                     memory.store_transition(obs, state, actions, rewards, obs_, state_, done)
-                    
-                    # if total_steps % 10 == 0 and is_training:
-                    #     maddpg_agents.learn(memory)   # Perform learning every 10 steps
+
+                    # Perform learning every step
                     maddpg_agents.learn(memory)
-                        
+
                     # Track losses for each agent after learning step
                     for agent in maddpg_agents.agents:
-                        # Store actor and critic losses for each agent
                         actor_losses.append(agent.actor_loss)  # Capture the actor loss
                         critic_losses.append(agent.critic_loss)  # Capture the critic loss
 
                     obs = obs_
                     score += sum(rewards.values())
-                    episode_rewards.append(total_reward)
-                    pacman_rewards.append(pacman_episode_reward)
-                    ghost_rewards.append(ghost_episode_reward)
+                    episode_step += 1
+                    episode_length += 1  # This is where the episode length is updated
 
                     total_steps += 1
-                    episode_step += 1
+
+                # After each episode ends, append the episode length to the list
+                episode_lengths.append(episode_length)
+
+                # Track rewards for each agent
+                episode_rewards.append(total_reward)
+                pacman_rewards.append(pacman_episode_reward)
+                ghost_rewards.append(ghost_episode_reward)
+
 
                 score_history.append(score)
                 avg_score = np.mean(score_history[-100:])
