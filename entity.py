@@ -60,6 +60,7 @@ class Entity(object):
             #self.position += self.directions[self.direction] * self.speed * dt
 
             #if self.overshotTarget():
+            self.initial_tile = self.tile
             self.node = self.target
             directions = self.validDirections()
             direction = self.directionMethod(directions)
@@ -176,4 +177,3 @@ class Entity(object):
             #print(direction)
             return False
         
-

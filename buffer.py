@@ -29,39 +29,46 @@ class MultiAgentReplayBuffer:
             self.actor_memory[agent] = {"state": [], "action": [], "reward": [], "next_state": [], "done": []}
 
     def store_transition(self, raw_obs, state, action, reward, raw_obs_, state_, done):
-        """
-        Store transitions into replay memory.
-        :param raw_obs: Dict of current observations for all agents (local for actors).
-        :param state: Centralized joint state for the critic.
-        :param action: Dict of actions taken by each agent.
-        :param reward: Dict of rewards received by each agent.
-        :param raw_obs_: Dict of next observations for all agents (local for actors).
-        :param state_: Centralized next joint state for the critic.
-        :param done: List of terminal flags for each agent (one flag per agent).
-        """
-        print("Storing transition...")
-        for agent, agent_done in zip(raw_obs.keys(), done):  # Iterate through agents and their corresponding done flags
-            self.actor_memory[agent]["state"].append(raw_obs[agent])  # Storing the observations
-            self.actor_memory[agent]["action"].append(action[agent])  # Storing the actions
-            self.actor_memory[agent]["reward"].append(reward[agent])  # Storing the rewards
-            self.actor_memory[agent]["next_state"].append(raw_obs_[agent])  # Storing the next state (next observations)
-            self.actor_memory[agent]["done"].append(agent_done)  # Storing the done flag for each agent
+        # print("\n==== Storing Transition Debugging ====")
+        
+        for agent in raw_obs.keys():
+            # print(f"Agent: {agent}")
+            # print(f"  - State shape before flattening: {np.array(raw_obs[agent]).shape}")  
+            # print(f"  - Next State shape before flattening: {np.array(raw_obs_[agent]).shape}")
+            
+            # Flatten state
+            raw_obs[agent] = np.array(raw_obs[agent]).flatten()
+            raw_obs_[agent] = np.array(raw_obs_[agent]).flatten()
+            
+            # print(f"  - State shape after flattening: {raw_obs[agent].shape}")  
+            # print(f"  - Next State shape after flattening: {raw_obs_[agent].shape}")
+            # print(f"  - Action stored: {action[agent]}")
+            # print(f"  - Reward stored: {reward[agent]}")
+        
+        # print(f"Centralized State shape: {np.array(state).shape}")
+        # print(f"Centralized Next State shape: {np.array(state_).shape}")
 
-        # Storing centralized data for critics
-        self.critic_memory["state"].append(state)  # Storing the joint state for critic
-        self.critic_memory["action"].append(action)  # Storing the joint actions
-        self.critic_memory["reward"].append(reward)  # Storing the joint rewards
-        self.critic_memory["next_state"].append(state_)  # Storing the next joint state for critic
-        self.critic_memory["done"].append(done)  # Storing the done flags for critics
+        # Store transition
+        for agent, agent_done in zip(raw_obs.keys(), done):  
+            self.actor_memory[agent]["state"].append(raw_obs[agent])  
+            self.actor_memory[agent]["action"].append(action[agent])  
+            self.actor_memory[agent]["reward"].append(reward[agent])  
+            self.actor_memory[agent]["next_state"].append(raw_obs_[agent])  
+            self.actor_memory[agent]["done"].append(agent_done)  
 
-        # Increment memory counter
+        self.critic_memory["state"].append(state)  
+        self.critic_memory["action"].append(action)  
+        self.critic_memory["reward"].append(reward)  
+        self.critic_memory["next_state"].append(state_)  
+        self.critic_memory["done"].append(done)  
+
         self.mem_cntr += 1
 
-        # If memory exceeds max size, remove the oldest transition
         if self.mem_cntr > self.mem_size:
             self.remove_oldest_transition()
-            
-        print(f"Memory size: {len(self.critic_memory['state'])}")
+        
+        # print(f"Memory size after storing: {len(self.critic_memory['state'])}")
+
 
 
     def remove_oldest_transition(self):
@@ -82,29 +89,16 @@ class MultiAgentReplayBuffer:
         self.critic_memory["done"].pop(0)
 
     def sample_buffer(self):
-        """
-        Sample a batch of experiences from the replay buffer.
-        """
-        # Sampling batch size from the memory buffer
         batch_idx = np.random.choice(len(self.critic_memory["state"]), self.batch_size, replace=False)
 
-        # Create batch dictionaries
-        batch = {}
-        for key in self.critic_memory:
-            batch[key] = [self.critic_memory[key][idx] for idx in batch_idx]
+        batch = {key: [self.critic_memory[key][idx] for idx in batch_idx] for key in self.critic_memory}
+        actor_batch = {agent: {key: [self.actor_memory[agent][key][idx] for idx in batch_idx] 
+                            for key in self.actor_memory[agent]} 
+                    for agent in self.actor_memory}
 
-        # Sample actor memory for each agent
-        actor_batch = {}
-        for agent in self.actor_memory:
-            actor_batch[agent] = {
-                "state": [self.actor_memory[agent]["state"][idx] for idx in batch_idx],
-                "action": [self.actor_memory[agent]["action"][idx] for idx in batch_idx],
-                "reward": [self.actor_memory[agent]["reward"][idx] for idx in batch_idx],
-                "next_state": [self.actor_memory[agent]["next_state"][idx] for idx in batch_idx],
-                "done": [self.actor_memory[agent]["done"][idx] for idx in batch_idx],
-            }
 
         return batch, actor_batch
+
 
     def ready(self):
         """

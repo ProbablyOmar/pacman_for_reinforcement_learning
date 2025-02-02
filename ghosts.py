@@ -36,6 +36,7 @@ class Ghost(Entity):
         else:
             self.sprites.update(dt)
             direction = agent_direction
+            self.initial_tile = self.tile
             self.initial_node = self.node
             self.target = self.getNewTarget(direction)
             self.node = self.target

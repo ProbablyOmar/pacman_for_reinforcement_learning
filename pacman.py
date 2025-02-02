@@ -48,18 +48,12 @@ class Pacman(Entity):
         return False
 
     def tile_collideCheck(self, other):
-        come_right = False
-        come_left = False
-        come_up = False
-        come_down = False
+        replace_places = False
 
         if other.name != PELLET and other.name != POWERPELLET:
-            come_right = self.tile[0] - other.tile[0] == -1 and self.tile[1] == other.tile[1] and self.direction == RIGHT and other.direction == LEFT
-            come_left = self.tile[0] - other.tile[0] == 1 and self.tile[1] == other.tile[1] and self.direction == LEFT and other.direction == RIGHT
-            come_up = self.tile[1] - other.tile[1] == 1 and self.tile[0] == other.tile[0] and self.direction == UP and other.direction == DOWN
-            come_down = self.tile[1] - other.tile[1] == -1 and self.tile[0] == other.tile[0] and self.direction == DOWN and other.direction == UP
+            replace_places = self.initial_tile == other.tile and self.tile == other.initial_tile
 
-        if self.tile == other.tile  or come_right or come_left or come_up or come_down:
+        if self.tile == other.tile  or replace_places:
             return True
         return False
 
@@ -98,6 +92,7 @@ class Pacman(Entity):
                 direction = self.getValidKey()
             else:
                 direction = agent_direction
+            self.initial_tile = self.tile
             self.initial_node = self.node
             self.target = self.getNewTarget(direction)
             self.node = self.target

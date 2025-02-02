@@ -7,8 +7,6 @@ from gymnasium import spaces
 from pettingzoo import ParallelEnv
 from run import GameController
 from constants import *
-from DQN_model import CustomCNN
-from stable_baselines3 import DQN
 from stable_baselines3.dqn import MultiInputPolicy
 from pettingzoo.test import parallel_api_test
 import os
@@ -98,16 +96,17 @@ class PacmanEnv(ParallelEnv):
         
         # print("agents_directions:", agents_directions)
         # print("agents_directions: pacman",agents_directions["pacman"].shape)
-        agents_directions["pacman"] = agents_directions["pacman"].squeeze(0).argmax(dim=-1).item()
+        # agents_directions["pacman"] = agents_directions["pacman"].squeeze(0).argmax(dim=-1).item()
+        pacman_action_index = agents_directions["pacman"].argmax(dim=-1).item()
         pacman_action = None 
-        if self.game.move_mode == DISCRETE_STEPS_MODE:
-            if agents_directions["pacman"] == 0:  # Right
+        if "pacman" in agents_directions:
+            if pacman_action_index == 0:  # Right
                 pacman_action = RIGHT
-            elif agents_directions["pacman"] == 1:  # Down
+            elif pacman_action_index == 1:  # Down
                 pacman_action = DOWN
-            elif agents_directions["pacman"] == 2:  # Up
+            elif pacman_action_index == 2:  # Up
                 pacman_action = UP
-            elif agents_directions["pacman"] == 3:  # Left
+            elif pacman_action_index == 3:  # Left
                 pacman_action = LEFT
             # else:
             #     print("Pacman actions provided" , agents_directions["pacman"])
@@ -119,6 +118,7 @@ class PacmanEnv(ParallelEnv):
             # print("Action space for ghosts:", env.action_space("ghosts"))
             
             # Process actions for ghost
+            # agents_directions["ghost"] = agents_directions["ghost"].squeeze(0).argmax(dim=-1).item()
             ghost_action = None
             if "ghosts" in agents_directions:
                 if agents_directions["ghosts"][0] == 0:  # Right
@@ -247,6 +247,7 @@ if __name__ == "__main__":
     joint_action_dim = sum([env.action_space(agent).n for agent in env.possible_agents])
     
     critic_dims = [joint_state_dim, joint_action_dim]
+    # print("critic dims", critic_dims)
     
     n_actions = 5
 
@@ -280,7 +281,7 @@ if __name__ == "__main__":
     num_episodes = 500000  #100000
     MAX_STEPS = 10000
     n_agents = len(possible_agents)
-    PRINT_INTERVAL =  500
+    PRINT_INTERVAL =  50
     total_steps = 0
     best_score = -np.inf 
     score_history = []
@@ -409,7 +410,7 @@ if __name__ == "__main__":
 
                 score_history.append(score)
                 avg_score = np.mean(score_history[-100:])
-                print(f"Episode {episode}, Score: {score}, Average Score: {avg_score:.2f}, Total Reward: {total_reward:.2f}")
+                # print(f"Episode {episode}, Score: {score}, Average Score: {avg_score:.2f}, Total Reward: {total_reward:.2f}")
 
                 # Save plot every PRINT_INTERVAL episodes
                 if episode % PRINT_INTERVAL == 0 and episode > 0:
@@ -421,5 +422,4 @@ if __name__ == "__main__":
 
             # Save the final model after all episodes are complete
             print("Training Completed!")
-
 

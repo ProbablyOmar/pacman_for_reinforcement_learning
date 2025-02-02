@@ -214,6 +214,7 @@ class GameController(object):
         pacman_direction = agents_directions["pacman"]
         if 'ghosts' in agents_directions:
             ghosts_directions = agents_directions['ghosts']
+            
         else:
             # Handle the case where 'ghosts' is not in the dictionary
             ghosts_directions = []

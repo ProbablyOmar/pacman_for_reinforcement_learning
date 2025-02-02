@@ -106,6 +106,8 @@ class MADDPG:
         self.n_agents = n_agents
         self.n_actions = n_actions
         
+        self.gamma = gamma
+        
         
         for agent_id, agent in enumerate(self.possible_agents):  # Use enumerate to get the integer index
             self.agents.append(Agent(actor_dims[agent_id], critic_dims, n_actions, agent_id, alpha=alpha, beta=beta, chkpt_dir=chkpt_dir))
@@ -157,103 +159,147 @@ class MADDPG:
         return actions
 
 
-            
-        
-
     def learn(self, memory):
         if not memory.ready():
             return
-        
+
         # Fetch data from replay buffer
         batch, actor_batch = memory.sample_buffer()
 
+        # Extract critic data from the batch
+        states = [
+            T.tensor(batch["state"][i], dtype=T.float).to(self.agents[0].actor.device)
+            for i in range(len(self.possible_agents))
+        ]
+        # print(f"States shape: {[state.shape for state in states]}")
+        
+        actions = []
+        for i, agent_name in enumerate(self.possible_agents):
+            action = batch["action"][i]  # action is a dictionary {agent_name: action_value}
+            # print(f"Actions: {action}")
+            action_for_agent = action[agent_name]  # Extract the action for the current agent
+            actions.append(T.tensor(action_for_agent, device=self.agents[0].actor.device))
+        
+        
 
-        # Extract critic data
-        states = T.tensor(batch["state"], dtype=T.float).to(self.agents[0].actor.device)
-        actions = batch["action"]
-        # rewards = T.tensor(batch["reward"], dtype=T.float).to(self.agents[0].actor.device)
-        # Assuming `batch["reward"]` is a dictionary with rewards for each agent.
-        # Convert the rewards for each agent into a list or array
-        # Debugging: print the structure of the batch to see if 'reward' is correct
-        print("Batch structure before learning:")
-        print(batch)  # Inspect the entire batch structure
-        print("Reward field in batch:", batch.get("reward"))  # Print out rewards field specifically
-        
-        # Debugging: Ensure rewards are a dictionary with the correct agent names
-        for agent in self.possible_agents:
-            print(f"Reward for {agent}: {batch['reward'].get(agent, 'No reward for this agent')}")
-            
-        rewards = T.tensor([batch["reward"][agent] for agent in self.possible_agents], dtype=T.float).to(self.agents[0].actor.device)
-        
-        states_ = T.tensor(batch["next_state"], dtype=T.float).to(self.agents[0].actor.device)
-        dones = T.tensor(batch["done"], dtype=T.float).to(self.agents[0].actor.device)
+        rewards = []
+        for sample in batch["reward"]:  # Iterate over batch elements (each is a dict)
+            reward_values = [sample[agent_name] for agent_name in self.possible_agents]  # Extract rewards
+            rewards.append(T.tensor(reward_values, dtype=T.float).unsqueeze(0).to(self.agents[0].actor.device))  # Shape [1, num_agents]
 
+        rewards = T.cat(rewards, dim=0)  # Stack into tensor of shape [batch_size, num_agents]
+        # print(f"Rewards shape: {rewards.shape}")
         
+        states_ = [
+            T.tensor(batch["next_state"][i], dtype=T.float).to(self.agents[0].actor.device)
+            for i in range(len(self.possible_agents))
+        ]
         
-        # Extract actor data
-        actor_states = {agent: T.tensor(actor_batch[agent]["state"], dtype=T.float).to(self.agents[0].actor.device) for agent in actor_batch}
-        actor_new_states = {agent: T.tensor(actor_batch[agent]["next_state"], dtype=T.float).to(self.agents[0].actor.device) for agent in actor_batch}
+        # print(f"Next States shape: {[state.shape for state in states_]}")
+
+        dones = []
+        for i, agent_name in enumerate(self.possible_agents):
+            done = batch["done"][i]  # Done flag for the agent
+            done = T.tensor(done, dtype=T.float).unsqueeze(0).to(self.agents[0].actor.device)  # Ensure it's a 1D tensor for each agent
+            dones.append(done)
+
+        states = T.stack(states)
+        # print(f"Stacked states shape: {states.shape}")
         
+        actions = T.stack(actions)
+        # print("&&&&&&&&&&&&&&")
+        # print(f"Actions shape: {actions.shape}")
+        states_ = T.stack(states_)
+        dones = T.stack(dones).view(-1, len(self.possible_agents))  # Ensure shape (1024, 2)
+        dones = dones.squeeze(1)
+
+        actions = actions.view(actions.size(0), -1) 
+        states_with_actions = T.cat([states, actions], dim=-1)
+        # print(f"States with actions shape: {states_with_actions.shape}")
         
+        # Ensure actor states and new states are correctly extracted from the actor_batch
+        actor_states = []
+        actor_new_states = []
+
+        for agent_name in self.possible_agents:
+            actor_states.append(actor_batch[agent_name]["state"])
+            actor_new_states.append(actor_batch[agent_name]["next_state"])
+
         device = self.agents[0].actor.device
-        
-        states = T.tensor(states, dtype=T.float).to(device)
-        actions = T.tensor(actions, dtype=T.float).to(device)
-        rewards = T.tensor(rewards).to(device)
-        states_ = T.tensor(states_, dtype=T.float).to(device)
-        dones = T.tensor(dones).to(device)
-        
 
-        
         all_agents_new_actions = []
         all_agents_new_mu_actions = []
         old_agents_actions = []
 
-        for agent_name, agent in zip(self.possible_agents, self.agents):
-            if agent_name in actor_new_states:
-                new_states = T.tensor(actor_new_states[agent_name], dtype=T.float).unsqueeze(1).to(device)
-                new_pi = agent.target_actor.forward(new_states)
-                all_agents_new_mu_actions.append(new_pi)
+        for agent_idx, agent in enumerate(self.agents):
+            new_states = T.tensor(actor_new_states[agent_idx], dtype=T.float).to(device)
 
-                mu_states = T.tensor(actor_states[agent_name], dtype=T.float).unsqueeze(1).to(device)
-                pi = agent.actor.forward(mu_states)
-                all_agents_new_actions.append(pi)
+            # Ensure that new_pi is not empty or None
+            new_pi = agent.target_actor.forward(new_states)
+            # print(f"Agent {agent_idx}: new_pi shape: {new_pi.shape if new_pi is not None else 'None'}")
 
-                old_agents_actions.append(actions[agent_name].unsqueeze(1))
+            if new_pi is not None:  # If new_pi is valid
+                all_agents_new_actions.append(new_pi.detach())
+            # else:
+            #     print(f"Warning: new_pi is None for agent {agent_idx}")
+
+            mu_states = T.tensor(actor_states[agent_idx], dtype=T.float).to(device)
+            pi = agent.actor.forward(mu_states)
+            all_agents_new_mu_actions.append(pi)
+
+            if len(actions) > agent_idx:
+                old_agents_actions.append(actions[agent_idx].unsqueeze(0).clone())
+            else:
+                old_agents_actions.append(T.zeros(1, dtype=T.long, device=self.agents[0].actor.device))
+
+        # Now check if the list has anything to concatenate
+        if all_agents_new_actions:
+            new_actions = T.cat(all_agents_new_actions).clone()
+        # else:
+        #     print("Warning: all_agents_new_actions is empty!")
+
+        # Proceed with the rest of your code...
+
+        mu = T.cat(all_agents_new_mu_actions).clone()
+        old_actions = T.cat(old_agents_actions).clone()
+
+        # Update Critic and Actor for each agent
+        for agent_idx, agent in enumerate(self.agents):
+            # Compute target Q-values (Bellman equation)
+            with T.no_grad():
+                next_Q = agent.target_critic.forward(states_, new_actions).flatten()
+                # print("******************************")
+                # print("states_.shape:", states_.shape)
+                # print("new_actions.shape:", new_actions.shape)
 
 
-            
-        new_actions = T.cat([acts for acts in all_agents_new_actions], dim=1)
-        mu = T.cat([acts for acts in all_agents_new_mu_actions], dim=1)
-        old_actions = T.cat([acts for acts in old_agents_actions], dim=1)
-        
-        # Now, for each agent, compute the critic loss
-        for i, agent in enumerate(self.agents):
-            critic_value_ = agent.target_critic.forward(T.cat([states_, new_actions], dim=-1)).flatten()
-            critic_value = agent.critic.forward(T.cat([states, old_actions], dim=-1)).flatten()
+            target_Q = rewards[:, agent_idx].unsqueeze(-1).to(self.agents[0].actor.device)
+            target_Q = target_Q + (self.gamma * next_Q * (1 - dones[:, agent_idx])) 
+            target_Q = target_Q.clone()  # Detach target_Q to avoid backpropagation issues
 
-            critic_value_[dones[:, 0]] = 0.0
-            
-            target = rewards[:, i] + agent.gamma * critic_value_
-            critic_loss = F.mse_loss(target, critic_value)
+            # Ensure current_Q and target_Q have matching shapes
+            state_for_critic = states  # States need to be passed separately
+            action_for_critic = actions  # Actions need to be passed separately
 
+            # Pass state and action separately to the critic
+            current_Q = agent.critic.forward(state_for_critic, action_for_critic).flatten()
+            current_Q = current_Q.unsqueeze(0).expand_as(target_Q).clone()
+
+            # Compute critic loss
+            critic_loss = F.mse_loss(current_Q, target_Q)
+
+            # Update critic
             agent.critic.optimizer.zero_grad()
             critic_loss.backward(retain_graph=True)
             agent.critic.optimizer.step()
 
-            print(f"critic_value_: {critic_value_}")
-            print(f"critic_value: {critic_value}")
-            print(f"critic_loss: {critic_loss.item()}")
+            # Compute actor loss
+            actor_loss = -agent.critic.forward(state_for_critic, action_for_critic).mean()  # Correctly calculate the actor loss
 
-            # Now calculate the actor loss
-            actor_loss = agent.critic.forward(states, mu).flatten()
-            actor_loss = -T.mean(actor_loss)
             agent.actor.optimizer.zero_grad()
             actor_loss.backward(retain_graph=True)
+            T.autograd.set_detect_anomaly(True)
             agent.actor.optimizer.step()
 
-            # Store actor loss in the agent
-            agent.actor_loss = actor_loss.item()  # Store the actor loss for later use or tracking
-            print(f"Actor loss: {actor_loss.item()}")
-
+            # Soft update of target networks
             agent.update_network_paramters()
